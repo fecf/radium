@@ -1,6 +1,8 @@
 #include "app.h"
 
 #include <fstream>
+#include <numeric>
+
 #include <base/algorithm.h>
 #include <base/minlog.h>
 #include <base/platform.h>
@@ -306,6 +308,13 @@ void App::initECS() {
                 *data = value; // Assign new value to std::string
             });
   world().component<ecs::Content>().member<std::string>("path");
+  world()
+      .component<ecs::ContentLayout>()
+      .member<float>("scale")
+      .member<float>("cx")
+      .member<float>("cy")
+      .member<float>("rotate")
+      .member<bool>("fit");
   world().component<ecs::ImageSource>().member<std::string>("path");
   world().component<ecs::Explorer>();
   world().component<ecs::FileEntryList>();
@@ -321,7 +330,6 @@ void App::initECS() {
   world()
       .system("input")
       .kind(flecs::PreUpdate)
-      .interval(1.0f / 60.0f)
       .iter([=](flecs::iter&) { 
     flecs::entity content_layout = world().singleton<ecs::ContentLayout>();
     if (ImGui::GetIO().MouseWheel > 0) {
@@ -340,14 +348,35 @@ void App::initECS() {
       OpenDialog();
     }
 
+    static ImVec2 drag_start_offset{};
+    static ImVec2 drag_start_mouse_pos{};
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+      auto* cl = world().get<ecs::ContentLayout>();
+      drag_start_offset = {
+          cl->cx,
+          cl->cy,
+      };
+      drag_start_mouse_pos = ImGui::GetIO().MousePos;
+    }
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+      const float& dx = ImGui::GetIO().MouseDelta.x;
+      const float& dy = ImGui::GetIO().MouseDelta.y;
+      content_layout.emit(ecs::ContentLayoutCenterEvent{
+          (drag_start_offset.x +
+              (ImGui::GetIO().MousePos.x - drag_start_mouse_pos.x)),
+          (drag_start_offset.y +
+              (ImGui::GetIO().MousePos.y - drag_start_mouse_pos.y))});
+    }
+
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
       if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
         ToggleFullscreen();
       }
     } else if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
       if (ImGui::IsKeyPressed(ImGuiKey_0)) {
+        content_layout.emit<ecs::ContentLayoutRotateResetEvent>();
         content_layout.emit<ecs::ContentLayoutFitEvent>();
-        content_layout.emit<ecs::ContentLayoutCenterEvent>();
+        content_layout.emit(ecs::ContentLayoutCenterEvent{});
       } else if (ImGui::IsKeyPressed(ImGuiKey_1)) {
         content_layout.emit<ecs::ContentLayoutResizeEvent>({1.0f});
       } else if (ImGui::IsKeyPressed(ImGuiKey_2)) {
@@ -359,6 +388,14 @@ void App::initECS() {
       } else if (ImGui::IsKeyPressed(ImGuiKey_O)) {
         OpenDialog();
       }
+    } else if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+      if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+        content_layout.emit(ecs::ContentLayoutRotateEvent{true});
+      } else if (ImGui::IsKeyPressed(ImGuiKey_W)) {
+        content_layout.emit(ecs::ContentLayoutRotateEvent{false});
+      }
+    } else if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+      content_layout.emit<ecs::ContentLayoutFitEvent>();
     } else if (ImGui::IsKeyPressed(ImGuiKey_F5)) {
       Refresh();
     } else if (ImGui::IsKeyPressed(ImGuiKey_Space)) {
@@ -377,7 +414,9 @@ void App::initECS() {
       .each([=](const ecs::Content& el) {
         world().singleton<ecs::FileEntryList>().emit(ecs::FileEntryListRefreshEvent{el.path});
         world().singleton<ecs::Content>().emit<ecs::ImageSourceRefreshEvent>();
-        world().singleton<ecs::ContentLayout>().emit<ecs::ContentLayoutZoomResetEvent>();
+        world().singleton<ecs::ContentLayout>().emit<ecs::ContentLayoutRotateResetEvent>();
+        world().singleton<ecs::ContentLayout>().emit<ecs::ContentLayoutFitEvent>();
+        world().singleton<ecs::ContentLayout>().emit<ecs::ContentLayoutCenterEvent>({});
       });
 
   world()
@@ -459,14 +498,57 @@ void App::initECS() {
       });
 
   flecs::entity content_layout = world().singleton<ecs::ContentLayout>();
+  content_layout.observe([=](const ecs::ContentLayoutCenterEvent& ev) {
+    world().set([=](ecs::ContentLayout& cl) {
+      cl.cx = ev.cx;
+      cl.cy = ev.cy;
+    });
+  });
+  content_layout.observe<ecs::ContentLayoutFitEvent>([=]{
+    world().set([=](ecs::ContentLayout& cl) {
+      cl.fit_flag = true;
+    });
+  });
   content_layout.observe<ecs::ContentLayoutZoomInEvent>([=]{
-    world().set([=](ecs::ContentLayout& cl) { cl.scale *= 1.2f; });
+    world().set([=](ecs::ContentLayout& cl) { 
+      float scale = 1.2f;
+      cl.scale *= scale;
+      ImVec2 mouse = ImGui::GetIO().MousePos - ImGui::GetIO().DisplaySize / 2.0f;
+      cl.cx = mouse.x - (mouse.x - cl.cx) * scale;
+      cl.cy = mouse.y - (mouse.y - cl.cy) * scale;
+    });
   });
   content_layout.observe<ecs::ContentLayoutZoomOutEvent>([=]{
-    world().set([=](ecs::ContentLayout& cl) { cl.scale *= 0.8f; });
+    world().set([=](ecs::ContentLayout& cl) { 
+      float scale = 0.8f;
+      cl.scale *= scale;
+      ImVec2 mouse = ImGui::GetIO().MousePos - ImGui::GetIO().DisplaySize / 2.0f;
+      cl.cx = mouse.x - (mouse.x - cl.cx) * scale;
+      cl.cy = mouse.y - (mouse.y - cl.cy) * scale;
+    });
   });
   content_layout.observe<ecs::ContentLayoutZoomResetEvent>([=]{
-    world().set([=](ecs::ContentLayout& cl) { cl.scale = 1.0f; });
+    world().set([=](ecs::ContentLayout& cl) { 
+      cl.scale = 1.0f; 
+    });
+  });
+  content_layout.observe([=](const ecs::ContentLayoutResizeEvent& ev) {
+    world().set([=](ecs::ContentLayout& cl) {
+      cl.scale = ev.scale;
+    });
+  });
+  content_layout.observe([=](const ecs::ContentLayoutRotateEvent& ev) {
+    world().set([=](ecs::ContentLayout& cl) {
+      cl.rotate += ev.clockwise ? -90 : 90;
+      if (cl.rotate < 0) {
+        cl.rotate += 360;
+      } else if (cl.rotate >= 360) {
+        cl.rotate -= 360;
+      }
+    });
+  });
+  content_layout.observe<ecs::ContentLayoutRotateResetEvent>([=] {
+    world().set([=](ecs::ContentLayout& cl) { cl.rotate = 0; });
   });
 
   world()
@@ -491,24 +573,50 @@ void App::initECS() {
             rad::Render* render = entity.get_mut<rad::Render>();
             render->alpha = alpha;
 
-            float image_x = (float)render->texture->array_src_width();
-            float image_y = (float)render->texture->array_src_height();
-            float aspect_ratio = image_x / image_y;
+            float image_w = (float)render->texture->array_src_width();
+            float image_h = (float)render->texture->array_src_height();
+            float aspect_ratio = image_w / image_h;
 
-            float window_x = (float)engine().GetWindow()->GetClientRect().width;
-            float window_y = (float)engine().GetWindow()->GetClientRect().height;
-            float window_aspect_ratio = window_x / window_y;
+            float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
+            float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
+            float viewport_aspect_ratio = viewport_w / viewport_h;
 
-            const auto* content_layout = world().get<ecs::ContentLayout>();
-            float scale_x = image_x / window_x * content_layout->scale;
-            float scale_y = image_y / window_y * content_layout->scale;
+            ecs::ContentLayout* content_layout = world().get_mut<ecs::ContentLayout>();
+            float scale = content_layout->scale;
+            float scaled_w = image_w * content_layout->scale;
+            float scaled_h = image_h * content_layout->scale;
+            if (content_layout->fit_flag) {
+              content_layout->fit_flag = false;
+              if (aspect_ratio > viewport_aspect_ratio) {
+                content_layout->scale = viewport_w / image_w;
+              } else {
+                content_layout->scale = viewport_h / image_h;
+              }
+              content_layout->cx = 0;
+              content_layout->cy = 0;
+            }
+
+            float theta = (float)(-content_layout->rotate * M_PI / 180.0f);
+            float translate_x = content_layout->cx;
+            float translate_y = content_layout->cy;
+            float scaled_rw = abs(cos(theta) * scaled_w - sin(theta) * scaled_h);
+            float scaled_rh = abs(sin(theta) * scaled_w + cos(theta) * scaled_h);
+            if (scaled_rw <= viewport_w && scaled_rh <= viewport_h) {
+              translate_x = 0;
+              translate_y = 0;
+            } else {
+              translate_x = std::min(translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
+              translate_y = std::min(translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
+              translate_x = std::max(translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
+              translate_y = std::max(translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
+            }
+            content_layout->cx = translate_x;
+            content_layout->cy = translate_y;
 
             entity.set(rad::Transform{
-                .translate =
-                    float3(content_layout->cx, -content_layout->cy, 0.0f),
-                .rotate = float3(0, 0, 0),
-                .scale =
-                    float3(scale_x, scale_y, 1.0f),
+                .translate = float3(translate_x, -translate_y, 0.0f),
+                .rotate = float3(0.0f, 0.0f, content_layout->rotate),
+                .scale = float3(scaled_w, scaled_h, 1.0f),
             });
           }
         }
@@ -516,6 +624,7 @@ void App::initECS() {
 
   world().system("debug").iter([=](flecs::iter& _) {
     ImGuiStyle& style = ImGui::GetStyle();
+    ImGui::GetIO().MouseDragThreshold = 6.0;
     style.FrameBorderSize = 0.0f;
     style.ChildBorderSize = 0.0f;
     style.WindowBorderSize = 0.0f;
@@ -570,8 +679,9 @@ void App::initECS() {
       ImGui::Text("FPS %f", ImGui::GetIO().Framerate);
       ImGui::Text("MouseWheel %f", ImGui::GetIO().MouseWheel);
 
-      ImGui::Text("Content");
-      ImGui::Text("%s", world().to_json(c).c_str());
+      ImGui::Text("Content\n%s", world().to_json(c).c_str());
+      ImGui::Text("ContentLayout\n%s",
+          world().to_json(world().get<ecs::ContentLayout>()).c_str());
 
       ImGui::Text("ImageSource");
       world().filter<ecs::ImageSource>().iter(
@@ -630,286 +740,3 @@ void App::processDeferredTasks() {
   }
 }
 
-
-/*
-
-
-  /*
-  void App::Open(int offset) {
-  if (!ctx_.io.dir.count()) {
-    return;
-  }
-
-  int target = rad::wrap(ctx_.io.ordinal, offset, 0, (int)(ctx_.io.dir.count() - 1));
-  const auto& entry = ctx_.io.dir.entries().at(target);
-  OpenFile(entry);
-}
-
-  ctx_.io.path = entry;
-
-  const std::string path = entry.path();
-  std::filesystem::path fspath(rad::to_wstring(path));
-  std::error_code ec;
-  if (!std::filesystem::is_regular_file(fspath, ec) || ec) {
-    DLOG_F("specified path is a not regular file.");
-    return;
-  }
-
-  const std::string parent = rad::to_string(fspath.parent_path().u8string());
-  if (ctx_.io.dir.path() != parent) {
-    ctx_.io.dir = rad::DirectoryList(path, false, true);
-    Sort(ctx_.io.sort_type, ctx_.io.sort_desc);
-    DLOG_F("changed directory to %s.", parent.c_str());
-  }
-
-  UpdateOrdinal();
-
-  // do request
-  auto callback = [=](std::shared_ptr<ImageCache> cache) {
-    PostDeferredTask([this, cache] {
-      if (cache->key() == ctx_.io.path.path()) {
-        ctx_.viewer.source = cache;
-        if (ctx_.prefs.fitted) {
-          ctx_.viewer.fit_once = true;
-          ctx_.viewer.always_fit = true;
-        } else {
-          ctx_.viewer.zoom = 1.0f;
-          ctx_.viewer.center_once = true;
-          ctx_.viewer.always_fit = false;
-        }
-      }
-    });
-  };
-
-  std::shared_ptr<ImageCache> cache = ctx_.source_cache->Request(path, callback);
-  if (cache && cache->status() == ImageCache::Status::Completed) {
-    ctx_.io.cached = true;
-    callback(cache);
-  } else {
-    ctx_.io.cached = false;
-  }
-  
-  // prefetch images
-  const auto& entries = ctx_.io.dir.entries();
-  int prev_index = rad::wrap(ctx_.io.ordinal, -1, 0, (int)ctx_.io.dir.count() - 1);
-  if ((prev_index != ctx_.io.ordinal) && (prev_index < (int)entries.size())) {
-    std::string prev_path = entries[prev_index].path();
-    ctx_.source_cache->Request(prev_path, callback);
-  }
-
-  int next_index = rad::wrap(ctx_.io.ordinal, +1, 0, (int)ctx_.io.dir.count() - 1);
-  if ((next_index != ctx_.io.ordinal) && (next_index < (int)entries.size())) {
-    std::string next_path = entries[next_index].path();
-    ctx_.source_cache->Request(next_path, callback);
-  }
-*/
-
-/*
-
-  for (auto it = layers_.rbegin(); it != layers_.rend(); ++it) {
-    const std::shared_ptr<ILayer> layer = *it;
-    const auto names = layer->GetNames();
-    for (auto it2 = names.rbegin(); it2 != names.rend(); ++it2) {
-      ImGuiWindow* window = ImGui::FindWindowByName(*it2);
-      if (window != NULL) {
-        ImGui::BringWindowToDisplayBack(window);
-      }
-    }
-  }
-
-
-  static ImVec2 last_pos = ImGui::GetMousePos();
-  static double last_time = 0.0;
-  static double idle_time = 0.0;
-  ImVec2 pos = ImGui::GetMousePos();
-  if (ImGui::IsAnyMouseDown() || pos.x != last_pos.x || pos.y != last_pos.y) {
-    last_pos = pos;
-    last_time = ImGui::GetTime();
-  }
-  idle_time = ImGui::GetTime() - last_time;
-
-*/
-
-/*
-
-void App::ViewerZoomUpDown(bool up) {
-  static std::vector<float> list{0.05f, 0.1f, 0.25f, 0.33f, 0.5f, 0.67f, 0.75f,
-      0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 4.0f, 5.0f,
-      10.0f};
-
-  float zoom = ctx_.viewer.zoom;
-  auto it = std::upper_bound(list.begin(), list.end(), zoom);
-  if (up) {
-    if (it == list.end()) {
-      it = std::prev(list.end());
-    }
-  } else {
-    if (it == list.end()) {
-      it = std::prev(list.end());
-    } else if (it != list.begin() && *it != zoom) {
-      it = std::prev(it);
-    }
-  }
-  zoom = *it;
-
-  ctx_.viewer.zoom = zoom;
-  ctx_.viewer.always_fit = false;
-}
-
-*/
-
-/*
-
-void App::Sort(rad::SortType type) {
-  ctx_.io.dir.sort(type, desc);
-  UpdateOrdinal();
-  ctx_.io.sort_type = type;
-  ctx_.io.sort_desc = desc;
-  if (ctx_.window.show_explorer) {
-    ctx_.explorer.thumbnail_scroll_once_flag = true;
-  }
-}
-
-*/
-
-/*
-
-void App::ViewerRefresh() {
-  ecs::Image* current = world().entity("current_image").get<Image>();
-  if (current && !current->path.empty()) {
-    world().entity("pending_image").set<ecs::Image>(ecs::Image{current->path});
-    world().entity("file_entries").set<ecs::FileEntryList>;
-  }
-}
-
-*/
-
-/*
-
-bool App::UpdateOrdinal() {
-  bool found = false;
-  const auto& entries = ctx_.io.dir.entries();
-  for (int i = 0; i < (int)entries.size(); ++i) {
-    if (entries[i].name() == ctx_.io.path.name()) {
-      ctx_.io.ordinal = i;
-      found = true;
-      break;
-    }
-  }
-  if (found) {
-    return true;
-  } else {
-    ctx_.io.ordinal = 0;
-    return false;
-  }
-}
-
-*/
-
-/*
-
-
-
-    auto texture = world().entity("current_image").get<ecs::Image>()->texture;
-    if (texture) {
-      int width = texture->array_src_width();
-      int height = texture->array_src_height();
-      if (width && height) {
-        PostDeferredTask([this, window, zoom, width, height] {
-          ctx_.viewer.zoom = zoom;
-          window->Resize((int)(width * zoom), (int)(height * zoom));
-        });
-      }
-    }
-*/
-
-/*
-
-    const ImVec2 viewport = ctx.viewer.viewport.GetSize();
-    if (!viewport.x || !viewport.y) {
-      return;
-    }
-
-    const ImVec2 img_size{
-        (float)texture->array_src_width(),
-        (float)texture->array_src_height(),
-    };
-
-    // force fitting
-    bool force_fit = ctx.viewer.always_fit || ctx.viewer.fit_once;
-    if (force_fit) {
-      ctx.viewer.center = {
-          img_size.x / 2.0f,
-          img_size.y / 2.0f,
-      };
-
-      const float sw = viewport.x / img_size.x;
-      const float sh = viewport.y / img_size.y;
-      if (sh > sw) {
-        ctx.viewer.zoom = sw;
-      } else {
-        ctx.viewer.zoom = sh;
-      }
-      if (ctx.viewer.fit_once) {
-        ctx.viewer.fit_once = false;
-      }
-    }
-
-    // force centering
-    if (ctx.viewer.center_once) {
-      ctx.viewer.center_once = false;
-      ctx.viewer.center = {
-          img_size.x / 2.0f,
-          img_size.y / 2.0f,
-      };
-    }
-
-    // cursor position
-    const float zoom = ctx.viewer.zoom;
-    const ImVec2 center = ctx.viewer.center;
-    const ImVec2 cursor_center = {
-        -(img_size.x * zoom * 0.5f) + (viewport.x / 2.0f),
-        -(img_size.y * zoom * 0.5f) + (viewport.y / 2.0f),
-    };
-    const ImVec2 cursor = {
-        cursor_center.x - ((center.x * zoom) - (img_size.x * zoom / 2.0f)),
-        cursor_center.y - ((center.y * zoom) - (img_size.y * zoom / 2.0f)),
-    };
-
-    const ImVec2 mouse = ImGui::GetMousePos();
-    ctx.viewer.mouse_pos = mouse;
-
-    const ImVec2 start = ImGui::GetCursorPos();
-    ImGui::SetCursorPos(cursor);
-    ImGui::Dummy({img_size.x * zoom, img_size.y * zoom});
-
-    const ImVec2 img_min = ImGui::GetItemRectMin() - start;
-    const ImVec2 img_max = ImGui::GetItemRectMax() - start;
-    ctx.viewer.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-
-    const ImVec2& vp_min = ctx.viewer.viewport.Min;
-    const ImVec2& vp_max = ctx.viewer.viewport.Max;
-    const ImVec2 vp_uv_pos = {
-        (std::max(vp_min.x, img_min.x) - img_min.x) / (img_max.x - img_min.x),
-        (std::max(vp_min.y, img_min.y) - img_min.y) / (img_max.y - img_min.y),
-    };
-    const ImVec2 vp_uv_size = {
-        ((std::min(vp_max.x, img_max.x)) - std::max(vp_min.x, img_min.x)) /
-            (img_max.x - img_min.x),
-        ((std::min(vp_max.y, img_max.y)) - std::max(vp_min.y, img_min.y)) /
-            (img_max.y - img_min.y),
-    };
-    ctx.viewer.viewport_uv = ImRect(vp_uv_pos, vp_uv_pos + vp_uv_size);
-
-    const ImVec2 mouse_pos = {
-        mouse.x - img_min.x,
-        mouse.y - img_min.y,
-    };
-    const ImVec2 mouse_pos_r = {
-        std::max(0.0f, std::min(img_size.x - 1.0f, mouse_pos.x / zoom)),
-        std::max(0.0f, std::min(img_size.y - 1.0f, mouse_pos.y / zoom)),
-    };
-    ctx.viewer.viewport_mouse_pos = mouse_pos;
-    ctx.viewer.viewport_mouse_pos_r = mouse_pos_r;
-
-*/

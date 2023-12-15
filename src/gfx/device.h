@@ -188,7 +188,7 @@ struct DrawCall {
   int4 scissor;     // x, y, w, h
 
   // shader mandatory variables
-  float4x4 projection_matrix;
+  float4x4 mvp;
   int array_src_width = 0;
   int array_src_height = 0;
 

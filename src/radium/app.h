@@ -41,13 +41,24 @@ struct ContentLayout {
   float scale = 1.0f;
   float cx = 0.0f;
   float cy = 0.0f;
+  float rotate = 0.0f;
+  bool fit_flag = false;
 };
 struct ContentLayoutFitEvent {};
-struct ContentLayoutCenterEvent {};
-struct ContentLayoutResizeEvent { float scale = 1.0f; };
+struct ContentLayoutCenterEvent {
+  float cx = 0.0f;
+  float cy = 0.0f;
+};
+struct ContentLayoutResizeEvent {
+  float scale = 1.0f;
+};
 struct ContentLayoutZoomInEvent {};
 struct ContentLayoutZoomOutEvent {};
 struct ContentLayoutZoomResetEvent {};
+struct ContentLayoutRotateEvent {
+  bool clockwise = true;
+};
+struct ContentLayoutRotateResetEvent {};
 
 struct Explorer {
   int zoom = 0;
@@ -110,38 +121,3 @@ class App {
   std::unique_ptr<rad::Texture> imgui_font_atlas_{};
   std::deque<std::string> mru_;
 };
-
-/*
-struct ContentWindow {
-  float alpha = 1.0f;
-  float zoom = 1.0f;
-  ImRect viewport;
-  ImVec2 center;  // center coords of image (before zoom)
-  bool always_fit = true;
-
-  // temporary flags
-  bool once_fit = false;
-  bool once_center = false;
-  float once_zoom_based_on_image = 0.0f;
-
-  // temporary
-  ImVec2 mouse_pos;
-  ImVec2 viewport_mouse_pos;
-  ImVec2 viewport_mouse_pos_r;
-  ImRect viewport_uv;
-
-  ImRect rect;
-
-  bool nav = true;
-  int nav_size = 200;
-  ImRect nav_rect;
-};
-*/
-
-/*
-struct ExplorerWindow {
-  int thumbnail_size = 256;
-  bool thumbnail_scroll_flag = false;
-};
-
-*/

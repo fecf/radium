@@ -799,7 +799,7 @@ void Device::CreateDeviceResources() {
     stream.BlendState = blend;
 
     CD3DX12_RASTERIZER_DESC rasterizer = CD3DX12_RASTERIZER_DESC(CD3DX12_DEFAULT());
-    rasterizer.CullMode = D3D12_CULL_MODE_NONE;
+    // rasterizer.FillMode = D3D12_FILL_MODE_WIREFRAME;
     stream.RasterizerState = rasterizer;
 
     CD3DX12_DEPTH_STENCIL_DESC1 ds{};
@@ -1138,7 +1138,7 @@ void Device::Render() {
       cmd_list->RSSetScissorRects(1, &scissor);
 
       EngineConstants engine_constants{};
-      memcpy(&engine_constants.mvp, &dc.projection_matrix, sizeof(engine_constants.mvp));
+      memcpy(&engine_constants.mvp, &dc.mvp, sizeof(engine_constants.mvp));
       engine_constants.array_src_width = dc.array_src_width;
       engine_constants.array_src_height = dc.array_src_height;
 
@@ -1278,14 +1278,6 @@ void Device::renderImGui(ComPtr<ID3D12GraphicsCommandList> ctx) {
   if (!dd || (dd->DisplaySize.x <= 0.0f) || (dd->DisplaySize.y <= 0.0f)) {
     return;
   }
-
-  const float outline_dist = 1.5f;
-  const float2 outline_offset[4]{
-      {-outline_dist / width_, 0.0f},
-      {+outline_dist / width_, 0.0f},
-      {0.0f, -outline_dist / height_},
-      {0.0f, +outline_dist / height_},
-  };
 
   ctx->SetGraphicsRootSignature(root_signature_.Get());
   ctx->SetPipelineState(imgui_pipeline_.Get());

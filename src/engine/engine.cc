@@ -199,9 +199,9 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
 }
 
 std::unique_ptr<Mesh> Engine::CreateMesh() {
-  const float x = 1.0f;
-  const float y = 1.0f;
-  const float z = 0.0f;
+  const float x = 0.5f;
+  const float y = 0.5f;
+  const float z = 0.5f;
 
   std::vector<gfx::InputLayout> data(6);
   data[0].pos = {-x, +y, z, 0.0f};
@@ -238,31 +238,39 @@ void Engine::Draw(flecs::world& world) {
     dc.viewport = viewport;
     dc.scissor = scissor;
 
-    // projection matrix
-    float3 t(0, 0, 0), r(0, 0, 0), s(1.0f, 1.0f, 1.0f);
-    auto* transform = world.entity(e).get<Transform>();
-    if (transform) {
-      t = transform->translate;
-      r = transform->rotate;
-      s = transform->scale;
+    auto* tf = world.entity(e).get<Transform>();
+    float4x4 v = identity;
+    float3 t = tf ? tf->translate : float3(0, 0, 0);
+    float3 r = tf ? tf->rotate : float3(0, 0, 0);
+    float3 s = tf ? tf->scale : float3(1, 1, 1);
+    if (tf) {
+      if (any(t)) v = mul(v, translation_matrix(t));
+      if (any(r)) {
+        auto rx = rotation_quat(float3{1.0f, 0.0f, 0.0f}, (float)(r.x * M_PI / 180.0f));
+        auto ry = rotation_quat(float3{0.0f, 1.0f, 0.0f}, (float)(r.y * M_PI / 180.0f));
+        auto rz = rotation_quat(float3{0.0f, 0.0f, 1.0f}, (float)(r.z * M_PI / 180.0f));
+        v = mul(v, rotation_matrix(rx));
+        v = mul(v, rotation_matrix(ry));
+        v = mul(v, rotation_matrix(rz));
+      }
+      if (any(s)) v = mul(v, scaling_matrix(s));
     }
-    float4x4 m = identity;
-    if (any(t)) m = mul(m, translation_matrix(t));
-    if (any(s)) m = mul(m, scaling_matrix(s));
-    if (any(r)) {
-      constexpr float3x3 i{
-          {1.0f, 0.0f, 0.0f},
-          {0.0f, 1.0f, 0.0f},
-          {0.0f, 0.0f, 1.0f},
-      };
-      auto rx = rotation_quat(i[0], (float)(r.x * 180.0f / M_PI));
-      auto ry = rotation_quat(i[1], (float)(r.y * 180.0f / M_PI));
-      auto rz = rotation_quat(i[2], (float)(r.z * 180.0f / M_PI));
-      m = mul(m, rotation_matrix(rx));
-      m = mul(m, rotation_matrix(ry));
-      m = mul(m, rotation_matrix(rz));
-    }
-    dc.projection_matrix = m;
+
+    const float L = -rect.width / 2.0f;
+    const float R = rect.width / 2.0f;
+    const float T = rect.height / 2.0f;
+    const float B = -rect.height / 2.0f;
+    float4x4 p{
+        {2.0f / (R - L), 0.0f, 0.0f, 0.0f},
+        {0.0f, 2.0f / (T - B), 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.5f, 0.0f},
+        {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
+    };
+
+    float4x4 mvp = identity;
+    mvp = mul(mvp, p);
+    mvp = mul(mvp, v);
+    dc.mvp = mvp;
 
     if (re.mesh) {
       dc.vertex_buffer = re.mesh->vertex();
