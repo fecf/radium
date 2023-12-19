@@ -223,7 +223,7 @@ std::unique_ptr<Mesh> Engine::CreateMesh() {
   return std::make_unique<Mesh>(vb, 6); 
 }
 
-void Engine::Draw(flecs::world& world) {
+void Engine::Draw() {
   using namespace linalg;
 
   Window::Rect rect = window_->GetClientRect();
@@ -231,14 +231,20 @@ void Engine::Draw(flecs::world& world) {
   int4 scissor{0, 0, rect.width, rect.height};
 
   std::vector<gfx::DrawCall> drawcalls;
-  world.each<Render>([&](flecs::entity_t e, const Render& re) {
+
+  static auto q = world_.query_builder<const Render>()
+               .order_by<Render>(
+                   [](flecs::entity_t e1, const Render* a, flecs::entity_t e2,
+                       const Render* b) { return (a->priority - b->priority); })
+               .build();
+  q.each([&](flecs::entity_t e, const Render& re) {
     using namespace linalg;
 
     gfx::DrawCall dc{};
     dc.viewport = viewport;
     dc.scissor = scissor;
 
-    auto* tf = world.entity(e).get<Transform>();
+    auto* tf = world_.entity(e).get<Transform>();
     float4x4 v = identity;
     float3 t = tf ? tf->translate : float3(0, 0, 0);
     float3 r = tf ? tf->rotate : float3(0, 0, 0);

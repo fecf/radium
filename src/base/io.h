@@ -10,6 +10,7 @@ namespace rad {
 extern const std::string kNativeSeparator;
 
 std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec) noexcept;
+std::string GetFullPath(const std::string& path) noexcept;
 
 enum class SortType {
   NameAsc,

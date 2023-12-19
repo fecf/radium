@@ -10,6 +10,17 @@
 
 namespace rad {
 
+template <typename T>
+float scale_to_fit(T image_w, T image_h, T viewport_w, T viewport_h) {
+  float aspect_ratio = (float)image_w / image_h;
+  float viewport_aspect_ratio = (float)viewport_w / viewport_h;
+  if (aspect_ratio > viewport_aspect_ratio) {
+    return (float)viewport_w / image_w;
+  } else {
+    return (float)viewport_h / image_h;
+  }
+}
+
 template <typename T, typename V>
 T::const_iterator find_next_element_by_value(const T& container, V value) {
   assert(!container.empty());

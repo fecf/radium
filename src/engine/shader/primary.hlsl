@@ -216,6 +216,11 @@ VSOutput VS(VSInput input)
 
 float3 get_uv(float x, float y)
 {
+    if (array_src_width == 0 && array_src_height == 0)
+    {
+        return float3(x, y, 0);
+    }
+
     float uw, uh, elems;
     tex.GetDimensions(uw, uh, elems);
 
@@ -242,10 +247,17 @@ float3 get_uv(float x, float y)
 
 float4 PS(VSOutput input) : SV_Target
 {
-    // return float4(saturate(input.uv.x), saturate(input.uv.y), 1.0f, 1.0f);
-
-    float x = clamp(input.uv.x * (array_src_width - 1), 0, array_src_width - 1);
-    float y = clamp(input.uv.y * (array_src_height - 1), 0, array_src_height - 1);
+    float x, y;
+    if (array_src_width == 0 && array_src_height == 0) 
+    {
+        x = input.uv.x;
+        y = input.uv.y;
+    }
+    else
+    {
+        x = clamp(input.uv.x * (array_src_width - 1), 0, array_src_width - 1);
+        y = clamp(input.uv.y * (array_src_height - 1), 0, array_src_height - 1);
+    }
 
     // load texture / filtering
     float4 c;

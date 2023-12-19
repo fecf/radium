@@ -312,7 +312,13 @@ const uint8_t* FileReader::Read(size_t pos, size_t size) {
 }
 
 std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec) noexcept {
-  std::filesystem::path fspath = std::filesystem::weakly_canonical(rad::to_wstring(path), ec);
+  std::string fullpath = GetFullPath(path);
+  if (fullpath.empty()) {
+    return {};
+  }
+
+  std::filesystem::path fspath =
+      std::filesystem::weakly_canonical(rad::to_wstring(fullpath), ec);
   if (ec) {
     return {};
   }
@@ -326,6 +332,20 @@ std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec)
     }
   }
   return rad::to_string(fspath.u8string());
+}
+
+std::string GetFullPath(const std::string& path) noexcept {
+  HANDLE handle = ::CreateFileW(to_wstring(path).c_str(), GENERIC_READ,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+      OPEN_EXISTING, FILE_ATTRIBUTE_READONLY | FILE_FLAG_NO_BUFFERING, NULL);
+  if (handle == INVALID_HANDLE_VALUE) {
+    return {};
+  }
+
+  std::vector<wchar_t> buf(32768);
+  ::GetFinalPathNameByHandleW(handle, buf.data(), (DWORD)buf.size(), 0x0);
+  ::CloseHandle(handle);
+  return to_string(buf.data());
 }
 
 }  // namespace rad

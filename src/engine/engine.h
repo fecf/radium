@@ -100,6 +100,8 @@ struct Transform {
 };
 
 struct Render {
+  int priority = 0;
+
   // mesh
   std::shared_ptr<Mesh> mesh;
 
@@ -118,7 +120,7 @@ class Engine {
 
   bool Initialize(const WindowConfig& config);
   void Destroy();
-  void Draw(flecs::world& world);
+  void Draw();
   bool BeginFrame();
   void EndFrame();
   Window* GetWindow() const;
