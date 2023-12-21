@@ -1,5 +1,6 @@
 #include "primary.h"
 
+
 static const float pi = 3.141592635;
 
 cbuffer Vtx : register(b0) {
@@ -216,11 +217,6 @@ VSOutput VS(VSInput input)
 
 float3 get_uv(float x, float y)
 {
-    if (array_src_width == 0 && array_src_height == 0)
-    {
-        return float3(x, y, 0);
-    }
-
     float uw, uh, elems;
     tex.GetDimensions(uw, uh, elems);
 
@@ -250,8 +246,10 @@ float4 PS(VSOutput input) : SV_Target
     float x, y;
     if (array_src_width == 0 && array_src_height == 0) 
     {
-        x = input.uv.x;
-        y = input.uv.y;
+        float uw, uh, elems;
+        tex.GetDimensions(uw, uh, elems);
+        x = input.uv.x * uw;
+        y = input.uv.y * uh;
     }
     else
     {
