@@ -292,7 +292,9 @@ void Engine::Draw() {
 
         Constants constants{};
         constants.alpha = re.alpha;
-        constants.filter = Filter::Nearest;
+        constants.filter = ::Filter::Bilinear;
+        constants.cs_src = ::ColorSpace::sRGB;
+        constants.cs_dst = ::ColorSpace::Linear;
         dc.constant_buffer.resize(sizeof(constants));
         memcpy(dc.constant_buffer.data(), &constants, sizeof(constants));
       }
