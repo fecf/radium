@@ -2,6 +2,7 @@
 
 #include <cassert>
 
+#include "nvjpeg_rw.h"
 #include "libjpegturbo_rw.h"
 #include "pnm_rw.h"
 #include "stb_rw.h"
@@ -11,6 +12,7 @@
 namespace rad {
 
 ImageRWFactory::ImageRWFactory() {
+  defines_.emplace_back(new ImageRWDefine<nvJPEGRW>("nvJPEG", {".jpeg", ".jpg"}));
   defines_.emplace_back(new ImageRWDefine<LibJpegTurboRW>("LibJpegTurbo", {".jpeg", ".jpg"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
@@ -34,7 +36,10 @@ std::unique_ptr<ImageDecoder> ImageRWFactory::CreatePreferredImageRW(
     auto it = std::find(
         define->extensions().begin(), define->extensions().end(), extension);
     if (it != define->extensions().end()) {
-      return define->create();
+      auto instance = define->create();
+      if (instance) {
+        return instance;
+      }
     }
   }
   return nullptr;

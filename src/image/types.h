@@ -12,6 +12,7 @@ enum class ImageFormat {
   RGBA16,
   RGBA32F,
   BGRA8,
+  RGB8 = 0,
   Unknown = -1,
 };
 
@@ -19,17 +20,5 @@ enum class ColorSpace {
   sRGB = 0,
   Linear,
 };
-
-inline int getImageFormatChannels(ImageFormat format) {
-  switch (format) {
-    case ImageFormat::RGBA8:
-    case ImageFormat::RGBA32F:
-    case ImageFormat::BGRA8:
-      return 4;
-    default:
-      assert(false && "unknown format.");
-      throw std::runtime_error("unknown format.");
-  }
-}
 
 }  // namespace rad

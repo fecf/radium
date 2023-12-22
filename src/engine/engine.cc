@@ -109,6 +109,9 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
   } else if (image->format() == ImageFormat::RGBA8) {
     dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
     bpp = 4;
+  } else if (image->format() == ImageFormat::RGB8) {
+    dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    bpp = 4;
   }
 
   if (tiled) {
@@ -140,24 +143,6 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
         assert(src_remain_width > 0 && src_remain_height > 0);
         assert(copy_width > 0 && copy_height > 0);
 
-        DXGI_FORMAT dxgi_format;
-        int bpp = 0;
-        if (image->format() == ImageFormat::BGRA8) {
-          dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
-          bpp = 4;
-        } else if (image->format() == ImageFormat::RGBA16) {
-          dxgi_format = DXGI_FORMAT_R16G16B16A16_UNORM;
-          bpp = 8;
-        } else if (image->format() == ImageFormat::RGBA32F) {
-          dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-          bpp = 16;
-        } else if (image->format() == ImageFormat::RGBA8) {
-          dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
-          bpp = 4;
-        } else {
-          throw std::runtime_error("unsupported format.");
-          return nullptr;
-        }
         int width_in_bytes = image->width() * bpp;
         size_t src_offset =
             (src_offset_y * image->stride()) + (src_offset_x * bpp);

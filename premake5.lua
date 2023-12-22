@@ -6,6 +6,7 @@ workspace (name)
     location "build"
 
 project (name)
+    buildcustomizations { "BuildCustomizations\\CUDA 12.3" }
     kind "WindowedApp"
     toolset "v143"
     language "C++"
