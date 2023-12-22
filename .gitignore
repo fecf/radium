@@ -402,3 +402,4 @@ build/generated
 !build/.keep
 !build/tools
 temp/
+!src/debug
