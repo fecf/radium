@@ -533,12 +533,12 @@ void App::initECS() {
   flecs::entity thumbnail_layout = world().singleton<ecs::ThumbnailLayout>();
   thumbnail_layout.observe<ecs::ThumbnailLayoutZoomInEvent>([=] {
     world().set([=](ecs::ThumbnailLayout& tl) {
-      tl.size = std::min(512, tl.size + 64);
+      tl.size = std::min(512, tl.size + 16);
     });
   });
   thumbnail_layout.observe<ecs::ThumbnailLayoutZoomOutEvent>([=] {
     world().set([=](ecs::ThumbnailLayout& tl) {
-      tl.size = std::max(64, tl.size - 64);
+      tl.size = std::max(16, tl.size - 16);
     });
   });
   thumbnail_layout.observe<ecs::ThumbnailLayoutToggleEvent>([=] {
@@ -587,82 +587,6 @@ void App::initECS() {
         });
       });
 
-  world()
-      .system<ecs::Image>("render_content")
-      .with<rad::Render>()
-      .without(Thumbnail)
-      .each([=](flecs::entity e, const ecs::Image& img) {
-        auto* render = e.get_mut<rad::Render>();
-
-        if (e.has(Latest)) {
-          render->alpha = 1.0f;
-        } else {
-          render->alpha = 0.0f;
-        }
-
-        const auto* content = world().get<ecs::ContentContext>();
-        float image_w = (float)render->texture->array_src_width();
-        float image_h = (float)render->texture->array_src_height();
-        float aspect_ratio = image_w / image_h;
-
-        float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
-        float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
-        float viewport_aspect_ratio = viewport_w / viewport_h;
-
-        auto* content_layout = world().get_mut<ecs::ContentLayout>();
-        float scaled_w = image_w * content_layout->scale;
-        float scaled_h = image_h * content_layout->scale;
-
-        float theta = (float)(-content_layout->rotate * M_PI / 180.0f);
-        float translate_x = content_layout->cx;
-        float translate_y = content_layout->cy;
-        float scaled_rw = abs(cos(theta) * scaled_w - sin(theta) * scaled_h);
-        float scaled_rh = abs(sin(theta) * scaled_w + cos(theta) * scaled_h);
-        if (scaled_rw <= viewport_w && scaled_rh <= viewport_h) {
-          translate_x = 0;
-          translate_y = 0;
-        } else {
-          translate_x = std::min(translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::min(translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
-          translate_x = std::max(translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::max(translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
-        }
-        content_layout->cx = translate_x;
-        content_layout->cy = translate_y;
-
-        e.set(rad::Transform{
-            .translate = float3(translate_x, -translate_y, 0.0f),
-            .rotate = float3(0.0f, 0.0f, content_layout->rotate),
-            .scale = float3(scaled_w, scaled_h, 1.0f),
-        });
-      });
-
-  world()
-      .system<ecs::ImageLayout>("render_thumbnail")
-      .with<ecs::Image>()
-      .with<rad::Render>()
-      .with(Thumbnail)
-      .each([=](flecs::entity e, ecs::ImageLayout& img) {
-        auto render = e.get_mut<rad::Render>();
-        if (!render) return;
-        render->alpha = 1.0f;
-        render->priority = 1;
-
-        float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
-        float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
-        float translate_x = -viewport_w / 2.0f + img.width / 2.0f + img.x;
-        float translate_y = -viewport_h / 2.0f + img.height / 2.0f + img.y;
-
-        float scale = rad::scale_to_fit(render->texture->width(),
-            render->texture->height(), (int)img.width, (int)img.height);
-        float scaled_w = render->texture->width() * scale;
-        float scaled_h = render->texture->height() * scale;
-        e.set(rad::Transform{
-            .translate = float3(translate_x, -translate_y, 0.0f),
-            .scale = float3(scaled_w, scaled_h, 1.0f),
-        });
-      });
-    
   world().system("imgui").iter([=](flecs::iter& _) {
     ImGuiStyle& style = ImGui::GetStyle();
 
@@ -705,75 +629,88 @@ void App::initECS() {
     style.Colors[ImGuiCol_TabHovered] = kAccentDark;
 
     // debug
-    ImGui::SetNextWindowPos({16, 16});
-    ImGui::SetNextWindowSize({800, 800});
-    if (ImGui::Begin("debug", 0,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs)) {
-      const ecs::ContentContext* c = world().get<ecs::ContentContext>();
+#ifdef _DEBUG
+    static bool debug = true;
+    if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+      debug = !debug;
+    }
+#else
+    static bool debug = false;
+#endif
+    if (debug) {
+      ImGui::SetNextWindowPos({16, 16});
+      ImGui::SetNextWindowSize({800, 800});
+      if (ImGui::Begin("debug", 0,
+              ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs)) {
+        const ecs::ContentContext* c = world().get<ecs::ContentContext>();
 
-      if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableNextColumn();
+        if (ImGui::BeginTable(
+                "##table", 2, ImGuiTableFlags_SizingStretchProp)) {
+          ImGui::TableNextColumn();
 
-        ImGui::Text("Framerate");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().Framerate);
-        ImGui::TableNextColumn();
+          ImGui::Text("Framerate");
+          ImGui::TableNextColumn();
+          ImGui::Text("%f", ImGui::GetIO().Framerate);
+          ImGui::TableNextColumn();
 
-        ImGui::Text("Delta");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().DeltaTime);
-        ImGui::TableNextColumn();
+          ImGui::Text("Delta");
+          ImGui::TableNextColumn();
+          ImGui::Text("%f", ImGui::GetIO().DeltaTime);
+          ImGui::TableNextColumn();
 
-        ImGui::Text("Content");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", world().to_json(c).c_str());
-        ImGui::TableNextColumn();
+          ImGui::Text("Content");
+          ImGui::TableNextColumn();
+          ImGui::Text("%s", world().to_json(c).c_str());
+          ImGui::TableNextColumn();
 
-        ImGui::Text("ContentLayout");
-        ImGui::TableNextColumn();
-        ImGui::Text(
-            "%s", world().to_json(world().get<ecs::ContentLayout>()).c_str());
-        ImGui::TableNextColumn();
+          ImGui::Text("ContentLayout");
+          ImGui::TableNextColumn();
+          ImGui::Text(
+              "%s", world().to_json(world().get<ecs::ContentLayout>()).c_str());
+          ImGui::TableNextColumn();
 
-        ImGui::Text("ImageSource (Content)");
-        ImGui::TableNextColumn();
-        query_content_images.iter([=](flecs::iter& it,
-                                      const ecs::Image* source) {
-          for (size_t i : it) {
-            ImGui::Text("%s", world().to_json<ecs::Image>(&source[i]).c_str());
-            if (it.entity(i).has(Keep)) {
-              ImGui::SameLine();
-              ImGui::Text("%s", "[Keep]");
-            }
-            if (it.entity(i).has<rad::Render>()) {
-              ImGui::SameLine();
-              ImGui::Text("%s", "[Render]");
-            }
-          }
-        });
-        ImGui::TableNextColumn();
+          ImGui::Text("ImageSource (Content)");
+          ImGui::TableNextColumn();
+          query_content_images.iter(
+              [=](flecs::iter& it, const ecs::Image* source) {
+                for (size_t i : it) {
+                  ImGui::Text(
+                      "%s", world().to_json<ecs::Image>(&source[i]).c_str());
+                  if (it.entity(i).has(Keep)) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", "[Keep]");
+                  }
+                  if (it.entity(i).has<rad::Render>()) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", "[Render]");
+                  }
+                }
+              });
+          ImGui::TableNextColumn();
 
-        ImGui::Text("ImageSource (Thumbnail)");
-        ImGui::TableNextColumn();
-        query_thumbnail_images.iter([=](flecs::iter& it,
-                                        const ecs::Image* source) {
-          for (size_t i : it) {
-            ImGui::Text("%s", world().to_json<ecs::Image>(&source[i]).c_str());
-            if (it.entity(i).has(Keep)) {
-              ImGui::SameLine();
-              ImGui::Text("%s", "[Keep]");
-            }
-            if (it.entity(i).has<rad::Render>()) {
-              ImGui::SameLine();
-              ImGui::Text("%s", "[Render]");
-            }
-          }
-        });
-        ImGui::TableNextColumn();
+          ImGui::Text("ImageSource (Thumbnail)");
+          ImGui::TableNextColumn();
+          query_thumbnail_images.iter(
+              [=](flecs::iter& it, const ecs::Image* source) {
+                for (size_t i : it) {
+                  ImGui::Text(
+                      "%s", world().to_json<ecs::Image>(&source[i]).c_str());
+                  if (it.entity(i).has(Keep)) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", "[Keep]");
+                  }
+                  if (it.entity(i).has<rad::Render>()) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", "[Render]");
+                  }
+                }
+              });
+          ImGui::TableNextColumn();
 
-        ImGui::EndTable();
+          ImGui::EndTable();
+        }
+        ImGui::End();
       }
-      ImGui::End();
     }
 
     flecs::entity content_layout = world().singleton<ecs::ContentLayout>();
@@ -900,7 +837,7 @@ void App::initECS() {
       const auto& io = ImGui::GetIO();
       ImGui::SetNextWindowPos({0, 0});
       ImGui::SetNextWindowSize({io.DisplaySize.x, io.DisplaySize.y});
-      ImGui::SetNextWindowBgAlpha(0.5f);
+      ImGui::SetNextWindowBgAlpha(0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1.0f));
 
@@ -919,7 +856,7 @@ void App::initECS() {
           }
         }
 
-        const ImVec2 kChildMargin{0, 48.0f};
+        const ImVec2 kChildMargin{0, 0};
         ImGui::SetCursorPos(kChildMargin);
         const ImVec2 kChildSize{
             io.DisplaySize.x - kChildMargin.x * 2.0f,
@@ -927,7 +864,7 @@ void App::initECS() {
         };
         if (ImGui::BeginChild("#thumbnail_scroll", kChildSize, 0)) {
           const float kSpacing = 1.0f;
-          const float size = std::max(128.0f, (float)tl->size) + kSpacing;
+          const float size = std::max(16.0f, (float)tl->size) + kSpacing;
 
           ImGui::SetCursorPos({0, 0});
           const ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -959,9 +896,11 @@ void App::initECS() {
                   col * size + margin_w, row * size + margin_h};
               ImGui::SetCursorPos(start);
 
+              const ImVec2 prev = ImGui::GetCursorPos();
               ImGui::Dummy({size - 1, size - 1});
               const ImVec2 p0 = ImGui::GetItemRectMin();
               const ImVec2 p1 = ImGui::GetItemRectMax();
+              const ImVec2 next = ImGui::GetCursorPos();
 
               if (ImGui::IsItemHovered()) {
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -983,6 +922,14 @@ void App::initECS() {
                 ImGui::GetWindowDrawList()->AddRect({p0.x - 1, p0.y - 1},
                     {p1.x + 1, p1.y + 1}, border_selected);
               }
+
+              // std::u8string filename = std::filesystem::path(rad::to_wstring(path)).filename().u8string();
+              // ImVec2 text_size = ImGui::CalcTextSize((const char*)filename.c_str(), 0, false, p1.x - p0.x);
+              // ImGui::PushTextWrapPos(p1.x);
+              // ImGui::SetCursorPos({prev.x, prev.y + (p1 - p0).y - text_size.y});
+              // ImGui::TextWrapped("%s", filename.c_str());
+              // ImGui::PopTextWrapPos();
+              // ImGui::SetCursorPos(next);
 
               flecs::entity e = query_thumbnail_images.find(
                   [&](const ecs::Image& t) { return path == t.path; });
@@ -1015,6 +962,86 @@ void App::initECS() {
       ImGui::PopStyleVar();
     }
   });
+
+  world()
+      .system<ecs::Image>("render_content")
+      .with<rad::Render>()
+      .without(Thumbnail)
+      .each([=](flecs::entity e, const ecs::Image& img) {
+        auto* render = e.get_mut<rad::Render>();
+        if (e.has(Latest)) {
+          const auto* thumbnail = world().get<ecs::ThumbnailLayout>();
+          if (thumbnail->show) {
+            render->alpha = 0.25f;
+          } else {
+            render->alpha = 1.0f;
+          }
+        } else {
+          render->alpha = 0.0f;
+        }
+
+        const auto* content = world().get<ecs::ContentContext>();
+        float image_w = (float)render->texture->array_src_width();
+        float image_h = (float)render->texture->array_src_height();
+        float aspect_ratio = image_w / image_h;
+
+        float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
+        float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
+        float viewport_aspect_ratio = viewport_w / viewport_h;
+
+        auto* content_layout = world().get_mut<ecs::ContentLayout>();
+        float scaled_w = image_w * content_layout->scale;
+        float scaled_h = image_h * content_layout->scale;
+
+        float theta = (float)(-content_layout->rotate * M_PI / 180.0f);
+        float translate_x = content_layout->cx;
+        float translate_y = content_layout->cy;
+        float scaled_rw = abs(cos(theta) * scaled_w - sin(theta) * scaled_h);
+        float scaled_rh = abs(sin(theta) * scaled_w + cos(theta) * scaled_h);
+        if (scaled_rw <= viewport_w && scaled_rh <= viewport_h) {
+          translate_x = 0;
+          translate_y = 0;
+        } else {
+          translate_x = std::min(translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::min(translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
+          translate_x = std::max(translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::max(translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
+        }
+        content_layout->cx = translate_x;
+        content_layout->cy = translate_y;
+
+        e.set(rad::Transform{
+            .translate = float3(translate_x, -translate_y, 0.0f),
+            .rotate = float3(0.0f, 0.0f, content_layout->rotate),
+            .scale = float3(scaled_w, scaled_h, 1.0f),
+        });
+      });
+
+  world()
+      .system<ecs::ImageLayout>("render_thumbnail")
+      .with<ecs::Image>()
+      .with<rad::Render>()
+      .with(Thumbnail)
+      .each([=](flecs::entity e, ecs::ImageLayout& img) {
+        auto render = e.get_mut<rad::Render>();
+        if (!render) return;
+        render->alpha = 1.0f;
+        render->priority = 1;
+
+        float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
+        float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
+        float translate_x = -viewport_w / 2.0f + img.width / 2.0f + img.x;
+        float translate_y = -viewport_h / 2.0f + img.height / 2.0f + img.y;
+
+        float scale = rad::scale_to_fit(render->texture->width(),
+            render->texture->height(), (int)img.width, (int)img.height);
+        float scaled_w = render->texture->width() * scale;
+        float scaled_h = render->texture->height() * scale;
+        e.set(rad::Transform{
+            .translate = float3(translate_x, -translate_y, 0.0f),
+            .scale = float3(scaled_w, scaled_h, 1.0f),
+        });
+      });
 }
 
 void App::Refresh() { 
@@ -1039,6 +1066,7 @@ void App::PostDeferredTask(std::function<void()> func) {
 }
 
 void App::processDeferredTasks() {
+  std::lock_guard lock(mutex_);
   while (deferred_tasks_.size()) {
     auto func = deferred_tasks_.front();
     func();

@@ -114,6 +114,7 @@ class App {
   void OpenDirectory(const std::string& path);
   void Refresh();
   void ToggleFullscreen();
+  void ToggleDebug();
 
  private:
   App() = default;
