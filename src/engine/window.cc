@@ -27,6 +27,58 @@ namespace windows {
 LRESULT CALLBACK staticWindowProc(
     HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
+class DropTarget : public IDropTarget {
+ public:
+  DropTarget() = delete;
+  DropTarget(std::function<void(const std::vector<std::string>&)> callback)
+      : callback_(callback) {}
+
+  ULONG AddRef() { return 1; }
+  ULONG Release() { return 0; }
+  HRESULT QueryInterface(REFIID riid, void** obj) {
+    if (riid == IID_IDropTarget) {
+      *obj = this;
+      return S_OK;
+    }
+    *obj = NULL;
+    return E_NOINTERFACE;
+  }
+  HRESULT DragEnter(IDataObject*, DWORD, POINTL, DWORD* effect) {
+    *effect &= DROPEFFECT_COPY;
+    return S_OK;
+  }
+  HRESULT DragLeave() { return S_OK; }
+  HRESULT DragOver(DWORD, POINTL, DWORD* effect) {
+    *effect &= DROPEFFECT_COPY;
+    return S_OK;
+  }
+  HRESULT Drop(IDataObject* data, DWORD, POINTL, DWORD* effect) {
+    FORMATETC fmte = {CF_HDROP, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    STGMEDIUM stgm;
+    if (SUCCEEDED(data->GetData(&fmte, &stgm))) {
+      HDROP hdrop = (HDROP)stgm.hGlobal;
+      UINT file_count = DragQueryFileW(hdrop, 0xFFFFFFFF, NULL, 0);
+      for (UINT i = 0; i < file_count; i++) {
+        TCHAR path[4096];
+        UINT cch = DragQueryFileW(hdrop, i, path, sizeof(path));
+        std::vector<std::string> paths;
+        if (cch > 0 && cch < MAX_PATH) {
+          paths.push_back(to_string(path));
+        }
+        if (paths.size()) {
+          callback_(paths);
+        }
+      }
+      ::ReleaseStgMedium(&stgm);
+    }
+    *effect &= DROPEFFECT_COPY;
+    return S_OK;
+  }
+
+ private:
+  std::function<void(const std::vector<std::string>&)> callback_;
+};
+
 class WindowImpl : public rad::Window {
  public:
   friend LRESULT CALLBACK staticWindowProc(
@@ -38,6 +90,7 @@ class WindowImpl : public rad::Window {
         config_(config),
         wp_(),
         client_rect_(),
+        window_rect_(),
         state_(State::Normal),
         active_(false),
         topmost_(false),
@@ -55,7 +108,7 @@ class WindowImpl : public rad::Window {
     wc.lpszClassName = id.c_str();
     ATOM atom = ::RegisterClassExW(&wc);
     if (atom == NULL) {
-      throw std::runtime_error("falied RegisterClassEx().");
+      throw std::runtime_error("falied to RegisterClassEx().");
     }
 
     // create window
@@ -69,109 +122,36 @@ class WindowImpl : public rad::Window {
     int y = config.y == kDefault ? CW_USEDEFAULT : config.y;
     int width = config.width == kDefault ? CW_USEDEFAULT : config.width;
     int height = config.height == kDefault ? CW_USEDEFAULT : config.height;
-    HWND hwnd = ::CreateWindowExW(exstyle, MAKEINTATOM(atom),
+    hwnd_ = ::CreateWindowExW(exstyle, MAKEINTATOM(atom),
         to_wstring(config.title).c_str(), style, x, y, width, height, parent,
         menu, instance, param);
-    if (hwnd == NULL) {
-      throw std::runtime_error("failed ::CreateWindowEx().");
+    if (hwnd_ == NULL) {
+      throw std::runtime_error("failed to CreateWindowEx().");
     }
-    hwnd_ = hwnd;
-    dnd_thread_ = std::thread(&WindowImpl::threadDragAndDrop, this);
+
+    // register dnd
+    HRESULT hr = ::OleInitialize(nullptr);
+    if (FAILED(hr)) {
+      throw std::runtime_error("failed to OleInitialize().");
+    }
+    drop_target_ = std::unique_ptr<DropTarget>(
+        new DropTarget([this](const std::vector<std::string>& d) {
+          dispatchEvent(window_event::DragDrop{d});
+        }));
+    hr = ::RegisterDragDrop(hwnd_, drop_target_.get());
+    if (FAILED(hr)) {
+      throw std::runtime_error("failed to RegisterDragDrop().");
+    }
   }
 
   virtual ~WindowImpl() noexcept {
-    exit_dnd_thread_ = true;
-    if (dnd_thread_.joinable()) {
-      dnd_thread_.join();
-    }
-
+    ::RevokeDragDrop(hwnd_);
+    ::OleUninitialize();
     if (hwnd_ != NULL) {
       ::DestroyWindow(hwnd_);
     }
   }
 
-  void threadDragAndDrop() {
-    HRESULT hr = ::OleInitialize(nullptr);
-    if (FAILED(hr)) {
-      assert(false && "failed OleInitialize()");
-      return;
-    }
-
-    class DropTarget : public IDropTarget {
-     public:
-      DropTarget() = delete;
-      DropTarget(std::function<void(const std::vector<std::string>&)> callback)
-          : callback_(callback) {}
-
-      ULONG AddRef() { return 1; }
-      ULONG Release() { return 0; }
-      HRESULT QueryInterface(REFIID riid, void** obj) {
-        if (riid == IID_IDropTarget) {
-          *obj = this;
-          return S_OK;
-        }
-        *obj = NULL;
-        return E_NOINTERFACE;
-      }
-      HRESULT DragEnter(IDataObject*, DWORD, POINTL, DWORD* effect) {
-        *effect &= DROPEFFECT_COPY;
-        return S_OK;
-      }
-      HRESULT DragLeave() { return S_OK; }
-      HRESULT DragOver(DWORD, POINTL, DWORD* effect) {
-        *effect &= DROPEFFECT_COPY;
-        return S_OK;
-      }
-      HRESULT Drop(IDataObject* data, DWORD, POINTL, DWORD* effect) {
-        FORMATETC fmte = {CF_HDROP, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
-        STGMEDIUM stgm;
-        if (SUCCEEDED(data->GetData(&fmte, &stgm))) {
-          HDROP hdrop = (HDROP)stgm.hGlobal;
-          UINT file_count = DragQueryFileW(hdrop, 0xFFFFFFFF, NULL, 0);
-          for (UINT i = 0; i < file_count; i++) {
-            TCHAR path[4096];
-            UINT cch = DragQueryFileW(hdrop, i, path, sizeof(path));
-            std::vector<std::string> paths;
-            if (cch > 0 && cch < MAX_PATH) {
-              paths.push_back(to_string(path));
-            }
-            if (paths.size()) {
-              callback_(paths);
-            }
-          }
-          ::ReleaseStgMedium(&stgm);
-        }
-        *effect &= DROPEFFECT_COPY;
-        return S_OK;
-      }
-
-     private:
-      std::function<void(const std::vector<std::string>&)> callback_;
-    };
-
-    std::unique_ptr<DropTarget> drop_target(
-        new DropTarget([this](const std::vector<std::string>& value) {
-          pushEvent(window_event::DragDrop{value});
-        }));
-    hr = ::RegisterDragDrop(hwnd_, drop_target.get());
-    if (FAILED(hr)) {
-      throw std::runtime_error("failed ::RegisterDragDrop().");
-    }
-
-    MSG msg{};
-    while (!exit_dnd_thread_) {
-      if (::PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-        ::TranslateMessage(&msg);
-        ::DispatchMessage(&msg);
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    ::RevokeDragDrop(hwnd_);
-    ::OleUninitialize();
-  }
-
-  // Inherited via IPlatformWindow
   virtual void Show(State state) override {
     if (state == State::Normal) {
       ::ShowWindow(hwnd_, SW_SHOWDEFAULT);
@@ -189,8 +169,6 @@ class WindowImpl : public rad::Window {
       ::ShowWindow(hwnd_, SW_SHOWMINIMIZED);
       ::SetForegroundWindow(next);
     }
-
-    ::SetTimer(hwnd_, (UINT_PTR)this, 16, nullptr);
   }
 
   virtual bool Update() override {
@@ -214,7 +192,7 @@ class WindowImpl : public rad::Window {
     }
   }
   virtual void Resize(int width, int height, bool client_size) override {
-    if (width == kDefault || width == kDefault) return;
+    if (width == kDefault || height == kDefault) return;
     if (state_ != State::Normal) return;
     if (fullscreen_) return;
 
@@ -390,13 +368,9 @@ class WindowImpl : public rad::Window {
       }
       case WM_ERASEBKGND:
         return TRUE;
-      case WM_TIMER:
-        break;
       case WM_ENTERSIZEMOVE:
-        ::SetTimer(hwnd_, 1, 16, NULL);
         break;
       case WM_EXITSIZEMOVE: {
-        ::KillTimer(hwnd_, 1);
         RECT rect{};
         ::GetClientRect(hwnd, &rect);
         client_rect_.width = rect.right - rect.left;
@@ -434,8 +408,7 @@ class WindowImpl : public rad::Window {
   bool frame_;
   bool fullscreen_;
 
-  std::thread dnd_thread_;
-  std::atomic_bool exit_dnd_thread_;
+  std::unique_ptr<DropTarget> drop_target_;
 };
 
 LRESULT CALLBACK staticWindowProc(

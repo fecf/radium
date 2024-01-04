@@ -106,22 +106,6 @@ class Window {
   }
 
  protected:
-  void pushEvent(const window_event::window_event_t& event) {
-    std::lock_guard lock(event_queue_mutex_);
-    event_queue_.push(event);
-  }
-
-  bool popEvent(window_event::window_event_t& event) {
-    std::lock_guard lock(event_queue_mutex_);
-    if (event_queue_.size()) {
-      event = event_queue_.front();
-      event_queue_.pop();
-      return true;
-    } else {
-      return false;
-    }
-  }
-
   bool dispatchEvent(const window_event::window_event_t& event) const {
     bool handled = false;
     for (const auto& cb : event_cb_) {
