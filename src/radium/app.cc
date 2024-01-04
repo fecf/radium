@@ -888,7 +888,7 @@ void App::initECS() {
         };
         if (ImGui::BeginChild("#thumbnail_scroll", kChildSize, 0)) {
           const float kSpacing = 1.0f;
-          const float size = std::max(16.0f, (float)tl->size) + kSpacing;
+          const float size = std::max(128.0f, (float)tl->size) + kSpacing;
 
           ImGui::SetCursorPos({0, 0});
           const ImVec2 avail = ImGui::GetContentRegionAvail();
