@@ -1,24 +1,23 @@
 #include "app.h"
 
-#include <fstream>
-#include <numeric>
-
 #include <base/algorithm.h>
 #include <base/minlog.h>
 #include <base/platform.h>
 #include <base/text.h>
-#include <engine/engine.h>
 #include <debug/live++.h>
+#include <engine/engine.h>
+
+#include <fstream>
+#include <json.hpp>
+#include <numeric>
 
 #include "constants.h"
+#include "embed/ms_regular.h"
 #include "image_provider.h"
 #include "imgui_widgets.h"
 #include "material_symbols.h"
-#include "service_locator.h"
-#include "embed/ms_regular.h"
 #include "resource/resource.h"
-
-#include <json.hpp>
+#include "service_locator.h"
 
 namespace {
 
@@ -80,8 +79,10 @@ void App::Start(int argc, char** argv) {
         auto event_resized = std::get_if<rad::window_event::Resize>(&data);
         if (event_resized) {
           // auto* camera = world().get<rad::Camera>();
-          // camera->viewport_width = (float)engine->GetWindow()->GetClientRect().width;
-          // camera->viewport_height = (float)engine->GetWindow()->GetClientRect().height;
+          // camera->viewport_width =
+          // (float)engine->GetWindow()->GetClientRect().width;
+          // camera->viewport_height =
+          // (float)engine->GetWindow()->GetClientRect().height;
         }
         auto event_dnd = std::get_if<rad::window_event::DragDrop>(&data);
         if (event_dnd) {
@@ -96,6 +97,11 @@ void App::Start(int argc, char** argv) {
   initImGui();
   initECS();
 
+  // Draw the first frame before show window
+  if (engine().BeginFrame()) {
+    engine().Draw();
+    engine().EndFrame();
+  }
   if (config_.window_state == rad::Window::State::Maximize) {
     engine().GetWindow()->Show(rad::Window::State::Maximize);
   } else {
@@ -103,8 +109,13 @@ void App::Start(int argc, char** argv) {
   }
 
   // start
-  if (!config_.mru.empty()) {
-    Open(config_.mru.front());
+  if (argc >= 2) {
+    std::string path = argv[1];
+    Open(path);
+  } else {
+    if (!config_.mru.empty()) {
+      Open(config_.mru.front());
+    }
   }
 
   // main loop
@@ -113,9 +124,13 @@ void App::Start(int argc, char** argv) {
     if (engine().BeginFrame()) {
       processDeferredTasks();
 
+#ifdef _DEBUG
       flecs::log::set_level(2);
       world().progress();
       flecs::log::set_level(-1);
+#else
+      world().progress();
+#endif
 
       engine().Draw();
       engine().EndFrame();
@@ -255,7 +270,8 @@ void App::initImGui() {
   // auto character_ranges = GetCharacterRanges().data();
   auto character_ranges = io.Fonts->GetGlyphRangesJapanese();
 
-  const std::string font_path = rad::platform::getFontDirectory() + "\\seguivar.ttf";
+  const std::string font_path =
+      rad::platform::getFontDirectory() + "\\seguivar.ttf";
   io.Fonts->Clear();  // Do not use default as primary font
 
   void* icon_ttf = (void*)___src_radium_embed_ms_regular_ttf;
@@ -303,7 +319,8 @@ void App::initImGui() {
   auto image = std::make_shared<rad::Image>(width, height, width * bpp,
       rad::ImageFormat::RGBA8, 4, rad::ColorSpace::sRGB, pixels);
   imgui_font_atlas_ = engine().CreateTexture(image);
-  ImTextureID texture_id = reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());
+  ImTextureID texture_id =
+      reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());
   io.Fonts->SetTexID(texture_id);
 }
 
@@ -348,8 +365,10 @@ void App::initECS() {
   auto Latest = world().entity();
 
   // queries
-  auto query_content_images = world().query_builder<ecs::Image>().without(Thumbnail).build();
-  auto query_thumbnail_images = world().query_builder<ecs::Image>().with(Thumbnail).build();
+  auto query_content_images =
+      world().query_builder<ecs::Image>().without(Thumbnail).build();
+  auto query_thumbnail_images =
+      world().query_builder<ecs::Image>().with(Thumbnail).build();
 
   world()
       .observer<ecs::ContentContext>("content")
@@ -358,8 +377,10 @@ void App::initECS() {
       .each([=](const ecs::ContentContext& el) {
         std::string title = std::format("{} - {}", kAppName, el.path);
         engine().GetWindow()->SetTitle(title.c_str());
-        world().singleton<ecs::FileEntryList>().emit(ecs::FileEntryListRefreshEvent{el.path});
-        world().singleton<ecs::ContentContext>().emit(ecs::ContentPrefetchEvent{el.path});
+        world().singleton<ecs::FileEntryList>().emit(
+            ecs::FileEntryListRefreshEvent{el.path});
+        world().singleton<ecs::ContentContext>().emit(
+            ecs::ContentPrefetchEvent{el.path});
       });
 
   world().singleton<ecs::FileEntryList>().observe(
@@ -394,7 +415,8 @@ void App::initECS() {
             [&](const ecs::Image& source) { return source.path == ev.path; });
         if (entity) {
           entity.add(Keep);
-          world().singleton<ecs::ContentContext>().emit(ecs::ContentPrefetchedEvent{ev.path});
+          world().singleton<ecs::ContentContext>().emit(
+              ecs::ContentPrefetchedEvent{ev.path});
         } else {
           world().entity().set(ecs::Image{ev.path}).add(Keep);
         }
@@ -545,11 +567,8 @@ void App::initECS() {
     world().set([=](ecs::ThumbnailLayout& tl) { tl.show = !tl.show; });
   });
 
-  world()
-      .observer<ecs::Image>()
-      .event<ecs::ImageLoadedEvent>()
-      .each([](flecs::entity e, ecs::Image& i) {
-  });
+  world().observer<ecs::Image>().event<ecs::ImageLoadedEvent>().each(
+      [](flecs::entity e, ecs::Image& i) {});
 
   world()
       .system<ecs::Image>("resource")
@@ -581,7 +600,8 @@ void App::initECS() {
             world().defer_end();
 
             world().defer_begin();
-            world().singleton<ecs::ContentContext>().enqueue(ecs::ContentPrefetchedEvent{img.path});
+            world().singleton<ecs::ContentContext>().enqueue(
+                ecs::ContentPrefetchedEvent{img.path});
             world().defer_end();
           });
         });
@@ -823,14 +843,16 @@ void App::initECS() {
         }
         ImGui::EndPopup();
       }
-      if (ImGui::IsWindowFocused() && ImGui::IsMouseClicked(ImGuiMouseButton_Right, false)) {
+      if (ImGui::IsWindowFocused() &&
+          ImGui::IsMouseClicked(ImGuiMouseButton_Right, false)) {
         ImGui::OpenPopup("##popup");
       }
       ImGui::End();
     }
 
     // thumbnail
-    const ecs::ThumbnailLayout* tl = thumbnail_layout.get<ecs::ThumbnailLayout>();
+    const ecs::ThumbnailLayout* tl =
+        thumbnail_layout.get<ecs::ThumbnailLayout>();
     const ecs::FileEntryList* fel = file_entry_list.get<ecs::FileEntryList>();
 
     if (tl->show) {
@@ -869,13 +891,16 @@ void App::initECS() {
           ImGui::SetCursorPos({0, 0});
           const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-          const int cols = std::min(std::max(1, (int)(avail.x / size)), (int)fel->entries.size());
+          const int cols = std::min(
+              std::max(1, (int)(avail.x / size)), (int)fel->entries.size());
           assert(cols > 0);
           const int rows = ((int)fel->entries.size() + (cols - 1)) / cols;
           ImGui::Dummy({cols * size, rows * size});
 
-          margin_w = std::max(0.0f, std::floor((avail.x - (cols * size)) / 2.0f));
-          margin_h = std::max(0.0f, std::floor((avail.y - (rows * size)) / 2.0f));
+          margin_w =
+              std::max(0.0f, std::floor((avail.x - (cols * size)) / 2.0f));
+          margin_h =
+              std::max(0.0f, std::floor((avail.y - (rows * size)) / 2.0f));
 
           const float sy = ImGui::GetScrollY();
           const float sh = avail.y;
@@ -923,11 +948,13 @@ void App::initECS() {
                     {p1.x + 1, p1.y + 1}, border_selected);
               }
 
-              // std::u8string filename = std::filesystem::path(rad::to_wstring(path)).filename().u8string();
-              // ImVec2 text_size = ImGui::CalcTextSize((const char*)filename.c_str(), 0, false, p1.x - p0.x);
+              // std::u8string filename =
+              // std::filesystem::path(rad::to_wstring(path)).filename().u8string();
+              // ImVec2 text_size = ImGui::CalcTextSize((const
+              // char*)filename.c_str(), 0, false, p1.x - p0.x);
               // ImGui::PushTextWrapPos(p1.x);
-              // ImGui::SetCursorPos({prev.x, prev.y + (p1 - p0).y - text_size.y});
-              // ImGui::TextWrapped("%s", filename.c_str());
+              // ImGui::SetCursorPos({prev.x, prev.y + (p1 - p0).y -
+              // text_size.y}); ImGui::TextWrapped("%s", filename.c_str());
               // ImGui::PopTextWrapPos();
               // ImGui::SetCursorPos(next);
 
@@ -949,7 +976,8 @@ void App::initECS() {
           ImGui::EndChild();
         }
 
-        ImVec2 size = ImGui::CalcTextSize(world().get<ecs::FileEntryList>()->path.c_str());
+        ImVec2 size = ImGui::CalcTextSize(
+            world().get<ecs::FileEntryList>()->path.c_str());
         ImGui::SetCursorPos({
             ImGui::GetContentRegionAvail().x / 2.0f - size.x / 2.0f,
             kChildMargin.y + margin_h - 32.0f,
@@ -1002,10 +1030,14 @@ void App::initECS() {
           translate_x = 0;
           translate_y = 0;
         } else {
-          translate_x = std::min(translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::min(translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
-          translate_x = std::max(translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::max(translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
+          translate_x = std::min(
+              translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::min(
+              translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
+          translate_x = std::max(
+              translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::max(
+              translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
         }
         content_layout->cx = translate_x;
         content_layout->cy = translate_y;
@@ -1044,9 +1076,7 @@ void App::initECS() {
       });
 }
 
-void App::Refresh() { 
-  Open(world().get<ecs::ContentContext>()->path); 
-}
+void App::Refresh() { Open(world().get<ecs::ContentContext>()->path); }
 
 void App::ToggleFullscreen() {
   PostDeferredTask([this] {
