@@ -997,15 +997,16 @@ void App::initECS() {
       .without(Thumbnail)
       .each([=](flecs::entity e, const ecs::Image& img) {
         auto* render = e.get_mut<rad::Render>();
-        if (e.has(Latest)) {
-          const auto* thumbnail = world().get<ecs::ThumbnailLayout>();
-          if (thumbnail->show) {
-            render->alpha = 0.25f;
-          } else {
-            render->alpha = 1.0f;
-          }
-        } else {
+        if (!e.has(Latest)) {
           render->alpha = 0.0f;
+          return;
+        }
+
+        const auto* thumbnail = world().get<ecs::ThumbnailLayout>();
+        if (thumbnail->show) {
+          render->alpha = 0.25f;
+        } else {
+          render->alpha = 1.0f;
         }
 
         const auto* content = world().get<ecs::ContentContext>();
@@ -1030,14 +1031,10 @@ void App::initECS() {
           translate_x = 0;
           translate_y = 0;
         } else {
-          translate_x = std::min(
-              translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::min(
-              translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
-          translate_x = std::max(
-              translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
-          translate_y = std::max(
-              translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
+          translate_x = std::min(translate_x, std::max(0.0f, (scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::min(translate_y, std::max(0.0f, (scaled_rh - viewport_h) / 2.0f));
+          translate_x = std::max(translate_x, std::min(0.0f, -(scaled_rw - viewport_w) / 2.0f));
+          translate_y = std::max(translate_y, std::min(0.0f, -(scaled_rh - viewport_h) / 2.0f));
         }
         content_layout->cx = translate_x;
         content_layout->cy = translate_y;
