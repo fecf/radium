@@ -343,9 +343,16 @@ std::string GetFullPath(const std::string& path) noexcept {
   }
 
   std::vector<wchar_t> buf(32768);
-  ::GetFinalPathNameByHandleW(handle, buf.data(), (DWORD)buf.size(), 0x0);
+  DWORD size = ::GetFinalPathNameByHandleW(handle, buf.data(), (DWORD)buf.size(), FILE_NAME_NORMALIZED);
   ::CloseHandle(handle);
-  return to_string(buf.data());
+
+  if (size >= 4) {
+    if (buf[0] == '\\' && buf[1] == '\\' && buf[2] == '?' && buf[3] == '\\') {
+      return to_string(buf.data() + 4);
+    } else {
+      return to_string(buf.data());
+    }
+  }
 }
 
 }  // namespace rad

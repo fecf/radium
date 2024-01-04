@@ -151,8 +151,8 @@ void App::Open(const std::string& path) {
   if (fullpath.empty()) {
     return;
   }
-  world().set<ecs::ContentContext>({path});
-  pushMRU(path);
+  world().set<ecs::ContentContext>({fullpath});
+  pushMRU(fullpath);
 }
 
 void App::OpenDialog() {
