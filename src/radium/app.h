@@ -7,12 +7,12 @@
 #include <queue>
 #include <string>
 
-#include <base/io.h>
-#include <base/text.h>
 #include <base/thread.h>
-#include <engine/engine.h>
 #include <engine/window.h>
-#include <flecs/flecs.h>
+
+namespace rad {
+struct Texture;
+}
 
 struct Config {
   int window_x = rad::Window::kDefault;

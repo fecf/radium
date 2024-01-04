@@ -353,6 +353,7 @@ std::string GetFullPath(const std::string& path) noexcept {
       return to_string(buf.data());
     }
   }
+  return "";
 }
 
 }  // namespace rad

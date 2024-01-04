@@ -64,7 +64,7 @@ project (name)
     buildoptions { 
         "/utf-8",
     }
-    editandcontinue "Off"  -- livepp
+    editandcontinue "On"
     vectorextensions "avx"
 
     filter {"platforms:x64"}
@@ -79,8 +79,6 @@ project (name)
         pchsource "src/pch.cc"
         pchheader "pch.h"
         forceincludes {"pch.h"}
-        buildoptions {"/Gy", "/Gw", "/Zi"}
-        linkoptions {"/FUNCTIONPADMIN", "/OPT:NOREF", "/OPT:NOICF"}
 
     filter {"configurations:Release"}
         defines { "NDEBUG" }
