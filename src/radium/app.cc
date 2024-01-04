@@ -267,12 +267,10 @@ void App::initImGui() {
   style = ImGuiStyle();
 
   auto icon_ranges = GetIconRanges().data();
-  // auto character_ranges = GetCharacterRanges().data();
   auto character_ranges = io.Fonts->GetGlyphRangesJapanese();
 
-  const std::string font_path =
-      rad::platform::getFontDirectory() + "\\seguivar.ttf";
-  io.Fonts->Clear();  // Do not use default as primary font
+  const std::string font_path = rad::platform::getFontDirectory() + "\\yugothr.ttc";
+  io.Fonts->Clear();  // Do not use proggy as primary font
 
   void* icon_ttf = (void*)___src_radium_embed_ms_regular_ttf;
   int icon_ttf_size = (int)___src_radium_embed_ms_regular_ttf_len;
@@ -282,11 +280,13 @@ void App::initImGui() {
     config.FontDataOwnedByAtlas = false;
     config.RasterizerMultiply = 1.0f;
     config.GlyphOffset.y = -1;
+    config.FontNo = 1;
     ImFont* font = io.Fonts->AddFontFromFileTTF(
         font_path.c_str(), 21.0f, &config, character_ranges);
     config.MergeMode = true;
     config.GlyphOffset.y = 4;
     config.RasterizerMultiply = 1.2f;
+    config.FontNo = 0;
     io.Fonts->AddFontFromMemoryTTF(
         icon_ttf, icon_ttf_size, 27.0f, &config, icon_ranges);
   }
@@ -296,11 +296,13 @@ void App::initImGui() {
     config.FontDataOwnedByAtlas = false;
     config.RasterizerMultiply = 1.0f;
     config.GlyphOffset.y = -1;
+    config.FontNo = 1;
     ImFont* font = io.Fonts->AddFontFromFileTTF(
         font_path.c_str(), 18.0f, &config, character_ranges);
     config.MergeMode = true;
     config.GlyphOffset.y = 4;
     config.RasterizerMultiply = 1.2f;
+    config.FontNo = 0;
     io.Fonts->AddFontFromMemoryTTF(
         icon_ttf, icon_ttf_size, 24.0f, &config, icon_ranges);
   }
