@@ -8,17 +8,19 @@
 #include <engine/engine.h>
 
 #include <fstream>
+#include <format>
 #include <numeric>
 
 #include <json.hpp>
 
+
 #include "constants.h"
-#include "embed/ms_regular.h"
 #include "image_provider.h"
-#include "imgui_widgets.h"
 #include "material_symbols.h"
-#include "resource/resource.h"
 #include "service_locator.h"
+
+#include "embed/ms_regular.h"
+#include "resource/resource.h"
 
 namespace {
 
@@ -34,6 +36,9 @@ int main(int argc, char** argv) {
   ::AllocConsole();
   FILE* fout = nullptr;
   ::freopen_s(&fout, "CONOUT$", "w", stdout);
+
+  minlog::add_sink(minlog::sink::cout());
+  minlog::add_sink(minlog::sink::debug());
 #endif
 
   {
@@ -53,39 +58,49 @@ int main(int argc, char** argv) {
 App::App() : i(Intent(*this, m)), v(View(*this, m, i)) {}
 
 void App::Start(int argc, char** argv) {
-#ifdef _DEBUG
-  minlog::add_sink(minlog::sink::cout());
-  minlog::add_sink(minlog::sink::debug());
-#endif
-
-  ServiceLocator::Provide(new CachedImageProvider());
-  ServiceLocator::Provide(new TiledImageProvider());
-
   loadSettings();
 
-  rad::WindowConfig window_config;
-  window_config.icon = IDI_ICON;
-  window_config.id = kAppName;
-  window_config.title = kAppName;
-  window_config.x = config_.window_x;
-  window_config.y = config_.window_y;
-  window_config.width = config_.window_width;
-  window_config.height = config_.window_height;
-  if (!engine().Initialize(window_config)) {
-    throw std::runtime_error("failed to rad::Engine::Initialize().");
-  }
-  engine().GetWindow()->AddEventListener(
-      [=](rad::window_event::window_event_t data) -> bool {
-        if (auto event_dnd = std::get_if<rad::window_event::DragDrop>(&data)) {
-          if (!event_dnd->value.empty()) {
-            const std::string& path = event_dnd->value.front();
-            PostDeferredTask([this, path] { i.Dispatch(Intent::Open{path}); });
-          }
-        }
-        return false;
-      });
+  ImGui::CreateContext();
+  setupImGui();
 
-  initImGui();
+  // Parallelising engine initialisation and font builds
+  {
+    auto initialize_service_locator_task = std::async(std::launch::async, [this] {
+      ServiceLocator::Provide(new CachedImageProvider());
+      ServiceLocator::Provide(new TiledImageProvider());
+    });
+    auto build_imgui_fonts_task =
+        std::async(std::launch::async, [this] { buildImGuiFonts(); });
+
+    rad::WindowConfig window_config;
+    window_config.icon = IDI_ICON;
+    window_config.id = kAppName;
+    window_config.title = kAppName;
+    window_config.x = config_.window_x;
+    window_config.y = config_.window_y;
+    window_config.width = config_.window_width;
+    window_config.height = config_.window_height;
+    if (!engine().Initialize(window_config)) {
+      throw std::runtime_error("failed to rad::Engine::Initialize().");
+    }
+    engine().GetWindow()->AddEventListener(
+        [=](rad::window_event::window_event_t data) -> bool {
+          if (auto event_dnd =
+                  std::get_if<rad::window_event::DragDrop>(&data)) {
+            if (!event_dnd->value.empty()) {
+              const std::string& path = event_dnd->value.front();
+              PostDeferredTask(
+                  [this, path] { i.Dispatch(Intent::Open{path}); });
+            }
+          }
+          return false;
+        });
+
+    initialize_service_locator_task.wait();
+    build_imgui_fonts_task.wait();
+
+    uploadImGuiFonts();
+  }
 
   // Draw the first frame before show window
   if (engine().BeginFrame()) {
@@ -180,19 +195,19 @@ bool App::saveSettings() {
   }
 }
 
-void App::initImGui() {
+void App::setupImGui() {
   ImGuiIO& io = ImGui::GetIO();
   io.IniFilename = NULL;  // Do not create imgui.ini
   io.WantSaveIniSettings = false;
+}
 
-  ImGuiStyle& style = ImGui::GetStyle();
-  style = ImGuiStyle();
+void App::buildImGuiFonts() {
+  ImGuiIO& io = ImGui::GetIO();
+  const std::string font_path = rad::platform::getFontDirectory() + "\\yugothr.ttc";
+  io.Fonts->Clear();  // Do not use proggy as primary font
 
   auto icon_ranges = GetIconRanges().data();
   auto character_ranges = io.Fonts->GetGlyphRangesJapanese();
-
-  const std::string font_path = rad::platform::getFontDirectory() + "\\yugothr.ttc";
-  io.Fonts->Clear();  // Do not use proggy as primary font
 
   void* icon_ttf = (void*)___src_radium_embed_ms_regular_ttf;
   int icon_ttf_size = (int)___src_radium_embed_ms_regular_ttf_len;
@@ -231,11 +246,12 @@ void App::initImGui() {
   }
   io.Fonts->AddFontDefault();  // 2 = Proggy
   io.Fonts->Build();
+}
 
-  // upload font
+void App::uploadImGuiFonts() {
   int width = 0, height = 0, bpp = 0;
   unsigned char* pixels = NULL;
-  io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height, &bpp);
+  ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height, &bpp);
   assert((pixels != NULL) && (width > 0) && (height > 0) && (bpp == 4));
 
   auto image = std::make_shared<rad::Image>(width, height, width * bpp,
@@ -243,7 +259,7 @@ void App::initImGui() {
   imgui_font_atlas_ = engine().CreateTexture(image);
   ImTextureID texture_id =
       reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());
-  io.Fonts->SetTexID(texture_id);
+  ImGui::GetIO().Fonts->SetTexID(texture_id);
 }
 
 ImFont* App::GetFont(FontType font) {

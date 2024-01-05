@@ -2,14 +2,11 @@
 
 #include "app_impl.h"
 
-#include <deque>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 
-#include <base/thread.h>
 #include <engine/window.h>
 
 namespace rad {
@@ -43,7 +40,9 @@ class App {
   ImFont* GetFont(FontType font);
 
  private:
-  void initImGui();
+  void setupImGui();
+  void buildImGuiFonts();
+  void uploadImGuiFonts();
   void processDeferredTasks();
   bool loadSettings();
   bool saveSettings();
@@ -53,7 +52,6 @@ class App {
   std::mutex mutex_;
   std::queue<std::function<void()>> deferred_tasks_;
   std::unique_ptr<rad::Texture> imgui_font_atlas_;
-  rad::ThreadPool pool_;
 
   Model m;
   View v;
