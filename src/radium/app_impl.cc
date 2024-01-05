@@ -124,6 +124,7 @@ void Intent::Dispatch(Action action) {
           }
         });
       },
+      [&](const ToggleOverlay& e) { m.overlay_show = !m.overlay_show; },
       [&](const ClearRecentlyOpened& e) { m.mru.clear(); },
       [&](const ThumbnailZoomIn& e) {
         m.thumbnail_size = std::min(512, m.thumbnail_size + 16);
@@ -298,7 +299,7 @@ void Model::PushMRU(const std::string& path) {
   }
 }
 
-std::shared_ptr<Model::Content> Model::GetLatestContent() {
+const std::shared_ptr<Model::Content> Model::GetLatestContent() const {
   auto it = std::find_if(contents.begin(), contents.end(),
       [this](const std::shared_ptr<Content> a) {
         return a->path == latest_content_path;

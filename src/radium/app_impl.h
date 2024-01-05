@@ -28,7 +28,7 @@ public:
   struct Content;
 
   void PushMRU(const std::string& path);
-  std::shared_ptr<Content> GetLatestContent();
+  const std::shared_ptr<Content> GetLatestContent() const;
 
 public:
   std::string content_path;
@@ -43,6 +43,8 @@ public:
   int thumbnail_size = 128;
   float thumbnail_alpha = 0.9f;
   float thumbnail_scroll = 0.0f;
+
+  bool overlay_show = false;
 
   std::string cwd;
   std::vector<std::string> cwd_entries;
@@ -102,6 +104,7 @@ struct Intent {
     bool clockwise;
   };
   struct Reset {};
+  struct ToggleOverlay {};
   struct ToggleThumbnail {};
   struct ToggleFullscreen {};
   struct ClearRecentlyOpened {};
@@ -122,6 +125,7 @@ struct Intent {
     ZoomReset,
     Rotate,
     Reset,
+    ToggleOverlay,
     ToggleThumbnail,
     ToggleFullscreen,
     ClearRecentlyOpened,

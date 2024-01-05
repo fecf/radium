@@ -5,6 +5,8 @@
 #include <base/algorithm.h>
 #include <base/platform.h>
 
+#include "material_symbols.h"
+
 void View::Update() {
   i.EvictUnusedContent();
   i.EvictUnusedThumbnail();
@@ -54,87 +56,17 @@ void View::renderImGui() {
   style.Colors[ImGuiCol_TabActive] = kAccentDark;
   style.Colors[ImGuiCol_TabHovered] = kAccentDark;
 
-
-  // debug
-#ifdef _DEBUG
-  static bool debug = true;
-  if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-    debug = !debug;
-  }
-#else
-  static bool debug = false;
-#endif
-  if (debug) {
-    ImGui::SetNextWindowPos({16, 16});
-    ImGui::SetNextWindowSize({800, 800});
-    if (ImGui::Begin("debug", 0,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs)) {
-      if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Framerate");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().Framerate);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Delta");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().DeltaTime);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Path");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.content_path.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Current Path");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.latest_content_path.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Current Directory");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.cwd.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Content Layout");
-        ImGui::TableNextColumn();
-        ImGui::Text("cx=%.02f cy=%.02f rotate=%.02f scale=%.02f", m.content_cx, m.content_cy, m.content_rotate, m.content_zoom);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Stored Contents");
-        ImGui::TableNextColumn();
-        for (const auto sp : m.contents) {
-          ImGui::Text("%s", sp->path.c_str());
-          if (sp->texture) {
-            ImGui::SameLine();
-            ImGui::Text("%s", "[Loaded]");
-          }
-        }
-        ImGui::TableNextColumn();
-
-        // ImGui::Text("Stored Thumbnails");
-        // ImGui::TableNextColumn();
-
-        // for (const auto& [path, sp] : m.thumbnails) {
-        //   ImGui::Text("%s", path.c_str());
-        //   if (sp->texture) {
-        //     ImGui::SameLine();
-        //     ImGui::Text("%s", "[Loaded]");
-        //   }
-        // }
-
-        ImGui::TableNextColumn();
-        ImGui::EndTable();
-      }
-      ImGui::End();
-    }
-  }
-
   // global input event
   if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
     i.Dispatch(Intent::ToggleThumbnail{});
+  } else if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) {
+    i.Dispatch(Intent::ToggleOverlay{});
   }
+  if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
+      i.Dispatch(Intent::ToggleFullscreen{});
+    }
+  } 
 
   // content
   const ImGuiIO& io = ImGui::GetIO();
@@ -159,23 +91,24 @@ void View::renderImGui() {
       static ImVec2 drag_start_offset{};
       static ImVec2 drag_start_mouse_pos{};
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
-        drag_start_offset = { m.content_cx, m.content_cy, };
+        drag_start_offset = {
+            m.content_cx,
+            m.content_cy,
+        };
         drag_start_mouse_pos = ImGui::GetIO().MousePos;
       }
       if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
         const float& dx = ImGui::GetIO().MouseDelta.x;
         const float& dy = ImGui::GetIO().MouseDelta.y;
         i.Dispatch(Intent::Center{
-          (drag_start_offset.x + (ImGui::GetIO().MousePos.x - drag_start_mouse_pos.x)),
-          (drag_start_offset.y + (ImGui::GetIO().MousePos.y - drag_start_mouse_pos.y)),
+            (drag_start_offset.x +
+                (ImGui::GetIO().MousePos.x - drag_start_mouse_pos.x)),
+            (drag_start_offset.y +
+                (ImGui::GetIO().MousePos.y - drag_start_mouse_pos.y)),
         });
       }
 
-      if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
-          i.Dispatch(Intent::ToggleFullscreen{});
-        }
-      } else if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+      if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
         if (ImGui::IsKeyPressed(ImGuiKey_0, false)) {
           i.Dispatch(Intent::Reset{});
         } else if (ImGui::IsKeyPressed(ImGuiKey_1, false)) {
@@ -229,7 +162,7 @@ void View::renderImGui() {
         ImGui::EndMenu();
       }
       if (ImGui::MenuItem("Open in explorer ...")) {
-        i.Dispatch(Intent::OpenInExplorer{ m.latest_content_path });
+        i.Dispatch(Intent::OpenInExplorer{m.latest_content_path});
       }
       ImGui::EndPopup();
     }
@@ -273,17 +206,22 @@ void View::renderImGui() {
       float margin_h = 0;
       if (ImGui::BeginChild("#thumbnail_scroll", kChildSize, 0)) {
         const float kSpacing = 1.0f;
-        const float kOuterSize = std::clamp((float)m.thumbnail_size, 16.0f, 512.0f) + kSpacing;
+        const float kOuterSize =
+            std::clamp((float)m.thumbnail_size, 16.0f, 512.0f) + kSpacing;
 
         ImGui::SetCursorPos({0, 0});
         const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-        const int cols = std::min(std::max(1, (int)(avail.x / kOuterSize)), (int)m.cwd_entries.size());
-        const int rows = (cols > 0) ? ((int)m.cwd_entries.size() + (cols - 1)) / cols : 0;
+        const int cols = std::min(std::max(1, (int)(avail.x / kOuterSize)),
+            (int)m.cwd_entries.size());
+        const int rows =
+            (cols > 0) ? ((int)m.cwd_entries.size() + (cols - 1)) / cols : 0;
         ImGui::Dummy({cols * kOuterSize, rows * kOuterSize});
 
-        margin_w = std::max(0.0f, std::floor((avail.x - (cols * kOuterSize)) / 2.0f));
-        margin_h = std::max(0.0f, std::floor((avail.y - (rows * kOuterSize)) / 2.0f));
+        margin_w =
+            std::max(0.0f, std::floor((avail.x - (cols * kOuterSize)) / 2.0f));
+        margin_h =
+            std::max(0.0f, std::floor((avail.y - (rows * kOuterSize)) / 2.0f));
         const float scroll_y = ImGui::GetScrollY();
 
         int row = (int)(std::floor(scroll_y / kOuterSize));
@@ -311,11 +249,14 @@ void View::renderImGui() {
             constexpr uint32_t border_selected = 0xc0ffffff;
             constexpr uint32_t border_hovered = 0xa0ffffff;
             if (ImGui::IsItemHovered()) {
-              ImGui::GetWindowDrawList()->AddRect({p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border_hovered);
+              ImGui::GetWindowDrawList()->AddRect(
+                  {p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border_hovered);
             } else if (path == m.content_path) {
-              ImGui::GetWindowDrawList()->AddRect({p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border_selected);
+              ImGui::GetWindowDrawList()->AddRect(
+                  {p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border_selected);
             } else {
-              ImGui::GetWindowDrawList()->AddRect({p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border);
+              ImGui::GetWindowDrawList()->AddRect(
+                  {p0.x - 1, p0.y - 1}, {p1.x + 1, p1.y + 1}, border);
             }
             if (ImGui::IsItemHovered()) {
               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -360,6 +301,106 @@ void View::renderImGui() {
     ImGui::PopStyleColor();
     ImGui::PopStyleVar();
   }
+
+  // overlay
+  if (m.overlay_show) {
+    ImGui::SetNextWindowPos({16, 16});
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0.9f));
+    if (ImGui::Begin("##overlay", 0,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing)) {
+
+      ImGui::Text("%s  %s", ICON_MD_PHOTO, m.latest_content_path.c_str());
+      if (auto content = m.GetLatestContent()) {
+        ImGui::Text("%s  %d x %d", ICON_MD_STRAIGHTEN, content->source_width, content->source_height);
+        ImGui::SameLine(0.0, 8.0f);
+        ImGui::Text("%s  %.2fx", ICON_MD_ZOOM_IN, m.content_zoom);
+        ImGui::Text("%s  %.2f deg", ICON_MD_ROTATE_RIGHT, m.content_rotate);
+      }
+
+      ImGui::End();
+    }
+    ImGui::PopStyleColor();
+  }
+
+  // debug
+#ifdef _DEBUG
+  static bool debug = true;
+  if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+    debug = !debug;
+  }
+#else
+  static bool debug = false;
+#endif
+  if (debug) {
+    ImGui::SetNextWindowPos({16, 16});
+    ImGui::SetNextWindowSize({800, 800});
+    if (ImGui::Begin("debug", 0,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs)) {
+      if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Framerate");
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", ImGui::GetIO().Framerate);
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Delta");
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", ImGui::GetIO().DeltaTime);
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Path");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", m.content_path.c_str());
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Current Path");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", m.latest_content_path.c_str());
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Current Directory");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", m.cwd.c_str());
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Content Layout");
+        ImGui::TableNextColumn();
+        ImGui::Text("cx=%.02f cy=%.02f rotate=%.02f scale=%.02f", m.content_cx,
+            m.content_cy, m.content_rotate, m.content_zoom);
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Stored Contents");
+        ImGui::TableNextColumn();
+        for (const auto sp : m.contents) {
+          ImGui::Text("%s", sp->path.c_str());
+          if (sp->texture) {
+            ImGui::SameLine();
+            ImGui::Text("%s", "[Loaded]");
+          }
+        }
+        ImGui::TableNextColumn();
+
+        // ImGui::Text("Stored Thumbnails");
+        // ImGui::TableNextColumn();
+
+        // for (const auto& [path, sp] : m.thumbnails) {
+        //   ImGui::Text("%s", path.c_str());
+        //   if (sp->texture) {
+        //     ImGui::SameLine();
+        //     ImGui::Text("%s", "[Loaded]");
+        //   }
+        // }
+
+        ImGui::TableNextColumn();
+        ImGui::EndTable();
+      }
+      ImGui::End();
+    }
+  }
+
+
 }
 
 void View::renderContent() {
