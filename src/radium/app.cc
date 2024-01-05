@@ -8,8 +8,9 @@
 #include <engine/engine.h>
 
 #include <fstream>
-#include <json.hpp>
 #include <numeric>
+
+#include <json.hpp>
 
 #include "constants.h"
 #include "embed/ms_regular.h"
@@ -28,28 +29,28 @@ std::string getSettingsPath() {
 
 }  // namespace
 
-App& app() {
-  static App instance;
-  return instance;
-}
-
 int main(int argc, char** argv) {
 #ifdef _DEBUG
-  flecs::log::enable_colors(false);
   ::AllocConsole();
   FILE* fout = nullptr;
   ::freopen_s(&fout, "CONOUT$", "w", stdout);
 #endif
 
-  app().Start(argc, argv);
-  engine().Destroy();
+  {
+    App app;
+    app.Start(argc, argv);
+  }
 
 #ifdef _DEBUG
-  ::fclose(fout);
+  if (fout != nullptr) {
+    ::fclose(fout);
+  }
   ::FreeConsole();
 #endif
   return 0;
 }
+
+App::App() : i(Intent(*this, m)), v(View(*this, m, i)) {}
 
 void App::Start(int argc, char** argv) {
 #ifdef _DEBUG
@@ -57,8 +58,8 @@ void App::Start(int argc, char** argv) {
   minlog::add_sink(minlog::sink::debug());
 #endif
 
-  ServiceLocator::provide(new ImageProvider());
-  ServiceLocator::provide(new TiledImageProvider());
+  ServiceLocator::Provide(new CachedImageProvider());
+  ServiceLocator::Provide(new TiledImageProvider());
 
   loadSettings();
 
@@ -71,30 +72,20 @@ void App::Start(int argc, char** argv) {
   window_config.width = config_.window_width;
   window_config.height = config_.window_height;
   if (!engine().Initialize(window_config)) {
-    throw std::runtime_error("failed to init graphics engine.");
+    throw std::runtime_error("failed to rad::Engine::Initialize().");
   }
   engine().GetWindow()->AddEventListener(
       [=](rad::window_event::window_event_t data) -> bool {
-        auto event_resized = std::get_if<rad::window_event::Resize>(&data);
-        if (event_resized) {
-          // auto* camera = world().get<rad::Camera>();
-          // camera->viewport_width =
-          // (float)engine->GetWindow()->GetClientRect().width;
-          // camera->viewport_height =
-          // (float)engine->GetWindow()->GetClientRect().height;
-        }
-        auto event_dnd = std::get_if<rad::window_event::DragDrop>(&data);
-        if (event_dnd) {
+        if (auto event_dnd = std::get_if<rad::window_event::DragDrop>(&data)) {
           if (!event_dnd->value.empty()) {
             const std::string& path = event_dnd->value.front();
-            PostDeferredTask([this, path] { Open(path); });
+            PostDeferredTask([this, path] { i.Dispatch(Intent::Open{path}); });
           }
         }
         return false;
       });
 
   initImGui();
-  initECS();
 
   // Draw the first frame before show window
   if (engine().BeginFrame()) {
@@ -110,102 +101,32 @@ void App::Start(int argc, char** argv) {
   // start
   if (argc >= 2) {
     std::string path = argv[1];
-    Open(path);
+    i.Dispatch(Intent::Open{path});
   } else {
     if (!config_.mru.empty()) {
-      Open(config_.mru.front());
+      i.Dispatch(Intent::Open{config_.mru.front()});
     }
   }
 
   // main loop
   while (true) {
-    if (engine().BeginFrame()) {
-      processDeferredTasks();
-
-#ifdef _DEBUG
-      flecs::log::set_level(2);
-      world().progress();
-      flecs::log::set_level(-1);
-#else
-      world().progress();
-#endif
-
-      engine().Draw();
-      engine().EndFrame();
-    } else {
+    if (!engine().BeginFrame()) {
       break;
     }
+    processDeferredTasks();
+    v.Update();
+    engine().Draw();
+    engine().EndFrame();
   }
 
   saveSettings();
 
-  imgui_font_atlas_ = {};
-  world().reset();
-}
-
-void App::Open(const std::string& path) {
-  // normalize
-  std::string fullpath = rad::GetFullPath(path);
-  if (fullpath.empty()) {
-    return;
-  }
-  world().set<ecs::ContentContext>({fullpath});
-  pushMRU(fullpath);
-}
-
-void App::OpenDialog() {
-  std::string path = rad::platform::ShowOpenFileDialog(
-      engine().GetWindow()->GetHandle(), "Open File ...");
-  if (!path.empty()) {
-    Open(path);
-  }
-}
-
-void App::OpenPrev() {
-  const std::string& path = world().get<ecs::ContentContext>()->path;
-  if (!path.empty()) {
-    const auto& entries = world().get<ecs::FileEntryList>()->entries;
-    auto it = std::find_if(entries.begin(), entries.end(),
-        [&](const std::string& entry) { return entry == path; });
-    if (it != entries.end()) {
-      if (it == entries.begin()) {
-        it = entries.end();
-      }
-      it = std::prev(it);
-      Open(*it);
-    }
-  }
-}
-
-void App::OpenNext() {
-  const std::string& path = world().get<ecs::ContentContext>()->path;
-  if (!path.empty()) {
-    const auto& entries = world().get<ecs::FileEntryList>()->entries;
-    auto it = std::find_if(entries.begin(), entries.end(),
-        [&](const std::string& entry) { return entry == path; });
-    if (it != entries.end()) {
-      it = std::next(it);
-      if (it == entries.end()) {
-        it = entries.begin();
-      }
-      Open(*it);
-    }
-  }
-}
-
-void App::OpenDirectory(const std::string& path) {
-  world().set<ecs::FileEntryList>({path});
-}
-
-void App::pushMRU(const std::string& path) {
-  auto it = std::remove(mru_.begin(), mru_.end(), path);
-  if (it != mru_.end()) {
-    mru_.erase(it, mru_.end());
-  }
-  mru_.push_front(path);
-  while (mru_.size() > 20) {
-    mru_.erase(std::prev(mru_.end()));
-  }
+  // release all resources
+  imgui_font_atlas_.reset();
+  ServiceLocator::Clear();
+  m.contents.clear();
+  m.thumbnails.clear();
+  engine().Destroy();
 }
 
 bool App::loadSettings() {
@@ -222,6 +143,9 @@ bool App::loadSettings() {
 
     std::ifstream ifs(path);
     config_ = nlohmann::json::parse(ifs);
+    for (const std::string& v : config_.mru) {
+      m.mru.push_back(v);
+    }
     return true;
   } catch (std::exception& ex) {
     LOG_F(WARNING, "failed to parse json. (%s)", ex.what());
@@ -238,7 +162,7 @@ bool App::saveSettings() {
   config_.window_height = engine().GetWindow()->GetClientRect().height;
   config_.window_state = engine().GetWindow()->GetState();
   config_.mru.clear();
-  for (const std::string& v : mru_) {
+  for (const std::string& v : m.mru) {
     config_.mru.push_back(v);
   }
   try {
@@ -307,9 +231,6 @@ void App::initImGui() {
   }
   io.Fonts->AddFontDefault();  // 2 = Proggy
   io.Fonts->Build();
-  font.normal = io.Fonts->Fonts[0];
-  font.small = io.Fonts->Fonts[1];
-  font.proggy = io.Fonts->Fonts[2];
 
   // upload font
   int width = 0, height = 0, bpp = 0;
@@ -325,18 +246,16 @@ void App::initImGui() {
   io.Fonts->SetTexID(texture_id);
 }
 
-void App::Refresh() { Open(world().get<ecs::ContentContext>()->path); }
-
-void App::ToggleFullscreen() {
-  PostDeferredTask([this] {
-    auto* window = engine().GetWindow();
-    if (window->IsBorderlessFullscreen() ||
-        window->GetState() == rad::Window::State::Maximize) {
-      window->ExitFullscreen();
-    } else {
-      window->EnterFullscreen(true);
-    }
-  });
+ImFont* App::GetFont(FontType font) {
+  if (font == FontType::Normal) {
+    return ImGui::GetIO().Fonts->Fonts[0];
+  } else if (font == FontType::Small) {
+    return ImGui::GetIO().Fonts->Fonts[1];
+  } else if (font == FontType::Proggy) {
+    return ImGui::GetIO().Fonts->Fonts[2];
+  } else {
+    return ImGui::GetIO().Fonts->Fonts[0];
+  }
 }
 
 void App::PostDeferredTask(std::function<void()> func) {
@@ -352,3 +271,4 @@ void App::processDeferredTasks() {
     deferred_tasks_.pop();
   }
 }
+

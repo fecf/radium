@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __cplusplus
+
 // stl
 #include <algorithm>
 #include <atomic>
@@ -83,5 +85,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include <flecs/flecs.h>
+#include <entt.hpp>
+
+#endif
 

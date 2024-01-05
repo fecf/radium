@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app_impl.h"
+
 #include <deque>
 #include <functional>
 #include <memory>
@@ -30,116 +32,30 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config, window_x, window_y,
     window_width, window_height, window_state, mru, nav, debug);
 }
 
-namespace ecs {
-
-struct ContentContext {
-  std::string path;
-  std::string latest;
-};
-struct ContentPrefetchEvent {
-  std::string path;
-};
-struct ContentPrefetchedEvent {
-  std::string path;
-};
-struct ContentLayout {
-  float scale = 1.0f;
-  float cx = 0.0f;
-  float cy = 0.0f;
-  float rotate = 0.0f;
-};
-struct ContentLayoutFitEvent {};
-struct ContentLayoutCenterEvent {
-  float cx = 0.0f;
-  float cy = 0.0f;
-};
-struct ContentLayoutResizeEvent {
-  float scale = 1.0f;
-};
-struct ContentLayoutZoomInEvent {};
-struct ContentLayoutZoomOutEvent {};
-struct ContentLayoutZoomResetEvent {};
-struct ContentLayoutRotateEvent {
-  bool clockwise = true;
-};
-struct ContentLayoutRotateResetEvent {};
-
-struct ThumbnailContext {};
-struct ThumbnailLayout {
-  bool show = false;
-  int size = 0;
-  float alpha = 0.9f;
-  float scroll = 0.0f;
-};
-struct ThumbnailLayoutZoomInEvent {};
-struct ThumbnailLayoutZoomOutEvent {};
-struct ThumbnailLayoutToggleEvent {};
-
-struct Image {
-  std::string path;
-};
-struct ImageLayout {
-  float x;
-  float y;
-  float width;
-  float height;
-};
-struct ImageLifetime {
-  int frame;
-};
-struct ImageLoadedEvent {
-};
-
-struct FileEntryList {
-  std::string path;
-  std::vector<std::string> entries;
-};
-struct FileEntryListRefreshEvent {
-  std::string path;
-};
-
-}  // namespace ecs
-
 class App {
  public:
-  friend App& app();
+  App();
 
   void Start(int argc, char** argv);
   void PostDeferredTask(std::function<void()> func);
 
-  void Open(const std::string& path);
-  void OpenDialog();
-  void OpenPrev();
-  void OpenNext();
-  void OpenDirectory(const std::string& path);
-  void Refresh();
-  void ToggleFullscreen();
-  void ToggleDebug();
+  enum FontType { Small, Normal, Proggy };
+  ImFont* GetFont(FontType font);
 
  private:
-  App() = default;
-
   void initImGui();
-  void initECS();
-
   void processDeferredTasks();
-
   bool loadSettings();
   bool saveSettings();
-
-  void pushMRU(const std::string& path);
-
-  struct Font {
-    ImFont* small = nullptr;
-    ImFont* normal = nullptr;
-    ImFont* proggy = nullptr;
-  } font;
 
  private:
   Config config_;
   std::mutex mutex_;
   std::queue<std::function<void()>> deferred_tasks_;
-  std::unique_ptr<rad::Texture> imgui_font_atlas_{};
-  std::deque<std::string> mru_;
+  std::unique_ptr<rad::Texture> imgui_font_atlas_;
   rad::ThreadPool pool_;
+
+  Model m;
+  View v;
+  Intent i;
 };

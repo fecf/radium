@@ -1,27 +1,21 @@
 #pragma once
 
-#include <functional>
-#include <map>
 #include <memory>
-#include <optional>
-#include <queue>
-#include <variant>
 #include <vector>
 
 #include "window.h"
 #include "image/image.h"
 
-#include <imgui.h>
-#include <json.hpp>
-
 #include <linalg.h>
 using namespace linalg::aliases;
+
+#include <entt.hpp>
 
 namespace rad {
 class Engine;
 }
 rad::Engine& engine();
-flecs::world& world();
+entt::registry& world();
 
 namespace rad {
 
@@ -101,6 +95,7 @@ struct Transform {
 
 struct Render {
   int priority = 0;
+  bool bypass = false;
 
   // mesh
   std::shared_ptr<Mesh> mesh;
@@ -113,7 +108,7 @@ struct Render {
 
 class Engine {
  public:
-  friend flecs::world& ::world();
+  friend entt::registry& ::world();
 
   Engine();
   ~Engine();
@@ -128,14 +123,12 @@ class Engine {
   std::unique_ptr<Texture> CreateTexture(std::shared_ptr<Image> image, bool tiled = false);
   std::unique_ptr<Mesh> CreateMesh();
 
-  nlohmann::json make_stats() const;
-
  private:
   std::unique_ptr<gfx::Device> device_;
   std::unique_ptr<Window> window_;
   std::unique_ptr<Texture> imgui_font_atlas_;
   bool rendering_;
-  flecs::world world_;
+  entt::registry world_;
 };
 
 }  // namespace rad

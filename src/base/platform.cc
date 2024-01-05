@@ -211,25 +211,20 @@ std::string ShowSaveDialog(
   return to_string(path);
 }
 
-bool OpenFolder(const std::string& dir) {
-  std::filesystem::path path(dir);
+bool OpenFolder(const std::string& path) {
+  std::filesystem::path fspath(path);
   std::error_code ec;
-  if (!std::filesystem::exists(path, ec) || ec) {
+  if (!std::filesystem::exists(fspath, ec) || ec) {
     return false;
   }
 
-  std::string str = path.string();
-  if (!std::filesystem::is_directory(path)) {
-    str = path.parent_path().string();
-  }
-
-  HINSTANCE ret = ::ShellExecuteW(
-      NULL, L"open", to_wstring(str).c_str(), NULL, NULL, SW_SHOWNORMAL);
+  std::wstring param = std::format(L"/select,\"{}\"", fspath.wstring());
+  HINSTANCE ret = ::ShellExecuteW(NULL, NULL, L"explorer.exe", param.c_str(), NULL, SW_SHOWNORMAL);
   return static_cast<int>(reinterpret_cast<uintptr_t>(ret)) >= 32;
 }
 
 void OpenURL(const std::string& url) {
-  ::ShellExecuteA(0, 0, url.c_str(), 0, 0, SW_SHOW);
+  ::ShellExecuteW(0, 0, to_wstring(url).c_str(), 0, 0, SW_SHOW);
 }
 
 void OpenControlPanelAppsDefaults() {

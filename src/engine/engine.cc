@@ -11,8 +11,6 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#include <DirectXMath.h>
-
 #ifdef IMGUI_VERSION
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
     HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -23,7 +21,7 @@ rad::Engine& engine() {
   return engine;
 }
 
-flecs::world& world() { return engine().world_; }
+entt::registry& world() { return engine().world_; }
 
 namespace rad {
 
@@ -42,10 +40,7 @@ uint64_t Texture::id() const {
   return static_cast<uint64_t>(resource_->id);
 }
 
-Engine::Engine() : rendering_(false) {
-  world_.component<Transform>();
-  world_.component<Render>(); 
-}
+Engine::Engine() : rendering_(false) {}
 
 Engine::~Engine() { Destroy(); }
 
@@ -232,19 +227,26 @@ void Engine::Draw() {
 
   std::vector<gfx::DrawCall> drawcalls;
 
-  static auto q = world_.query_builder<const Render>()
-               .order_by<Render>(
-                   [](flecs::entity_t e1, const Render* a, flecs::entity_t e2,
-                       const Render* b) { return (a->priority - b->priority); })
-               .build();
-  q.each([&](flecs::entity_t e, const Render& re) {
+  world_.sort<Render>([&](const entt::entity lhs, const entt::entity rhs) { 
+    auto a = world().get<Render>(lhs).priority;
+    auto b = world().get<Render>(rhs).priority;
+    if (a == b) return (lhs < rhs);
+    return a < b;
+  });
+
+  auto view = world_.view<Render>();
+  view.each([&](const entt::entity e, const Render& re) {
     using namespace linalg;
+
+    if (re.bypass) {
+      return;
+    }
 
     gfx::DrawCall dc{};
     dc.viewport = viewport;
     dc.scissor = scissor;
 
-    auto* tf = world_.entity(e).get<Transform>();
+    auto* tf = world_.try_get<Transform>(e);
     float4x4 v = identity;
     float3 t = tf ? tf->translate : float3(0, 0, 0);
     float3 r = tf ? tf->rotate : float3(0, 0, 0);
@@ -327,23 +329,6 @@ void Engine::EndFrame() {
   ImGui::Render();
   device_->Render();
   rendering_ = false;
-}
-
-nlohmann::json Engine::make_stats() const {
-  nlohmann::json json{
-      {
-          "engine",
-          {
-          },
-      },
-      {
-          "rhi", device_->make_rhi_stats(),
-      },
-      {
-          "device", device_->make_device_stats(),
-      },
-  };
-  return json;
 }
 
 }  // namespace rad

@@ -24,7 +24,6 @@ project (name)
         "src/third_party",
         "src/third_party/d3d12memoryallocator",
         "src/third_party/directx-headers/include",
-        "src/third_party/flecs",
         "src/third_party/imgui",
         "src/third_party/imgui/backends",
         "src/third_party/libjpeg-turbo/include",
@@ -34,6 +33,7 @@ project (name)
         "src/third_party/stb",
         "src/third_party/wil/include",
         "src/third_party/wuffs",
+        "src/third_party/entt",
         "build/generated",
     }
     removefiles {
@@ -89,7 +89,7 @@ project (name)
 
     filter "files:**.c"
         flags {"NoPCH"}
-        forceincludes {"dummy.h"}
+        forceincludes {"pch.h"}
 
     -- /Zpr: Packs matrices in row-major order by default
     filter { "files:src/**.hlsl" }
