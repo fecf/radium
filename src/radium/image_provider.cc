@@ -28,14 +28,14 @@ std::shared_ptr<rad::Texture> ImageProvider::Request(
 
 std::shared_ptr<rad::Texture> CachedImageProvider::Request(
   const std::string& path, std::optional<int> max_size) {
-  auto texture = get(path);
-  if (texture) {
-    return texture;
+  auto cache = get(path);
+  if (cache.texture) {
+    return cache.texture;
   }
 
-  texture = ImageProvider::Request(path, max_size);
+  auto texture = ImageProvider::Request(path, max_size);
   if (texture) {
-    put(path, texture);
+    put(path, {max_size.value_or(0), texture});
   }
   return texture;
 }

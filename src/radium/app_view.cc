@@ -113,18 +113,18 @@ void View::renderImGui() {
         }
         ImGui::TableNextColumn();
 
-        ImGui::Text("Stored Thumbnails");
-        ImGui::TableNextColumn();
+        // ImGui::Text("Stored Thumbnails");
+        // ImGui::TableNextColumn();
 
-        for (const auto sp : m.thumbnails) {
-          ImGui::Text("%s", sp->path.c_str());
-          if (sp->texture) {
-            ImGui::SameLine();
-            ImGui::Text("%s", "[Loaded]");
-          }
-        }
+        // for (const auto& [path, sp] : m.thumbnails) {
+        //   ImGui::Text("%s", path.c_str());
+        //   if (sp->texture) {
+        //     ImGui::SameLine();
+        //     ImGui::Text("%s", "[Loaded]");
+        //   }
+        // }
+
         ImGui::TableNextColumn();
-        
         ImGui::EndTable();
       }
       ImGui::End();
@@ -249,8 +249,6 @@ void View::renderImGui() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1.0f));
 
-    float margin_w = 0.0f;
-    float margin_h = 0.0f;
     if (ImGui::Begin("##thumbnail", 0, ImGuiWindowFlags_NoDecoration)) {
       if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
         if (ImGui::GetIO().MouseWheel > 0) {
@@ -270,27 +268,29 @@ void View::renderImGui() {
           io.DisplaySize.x - kChildMargin.x * 2.0f,
           io.DisplaySize.y - kChildMargin.y * 2.0f,
       };
+
+      float margin_w = 0;
+      float margin_h = 0;
       if (ImGui::BeginChild("#thumbnail_scroll", kChildSize, 0)) {
         const float kSpacing = 1.0f;
-        const float size = std::max(128.0f, (float)m.thumbnail_size) + kSpacing;
+        const float kOuterSize = std::clamp((float)m.thumbnail_size, 16.0f, 512.0f) + kSpacing;
 
         ImGui::SetCursorPos({0, 0});
         const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-        const int cols = std::min(std::max(1, (int)(avail.x / size)), (int)m.cwd_entries.size());
+        const int cols = std::min(std::max(1, (int)(avail.x / kOuterSize)), (int)m.cwd_entries.size());
         const int rows = (cols > 0) ? ((int)m.cwd_entries.size() + (cols - 1)) / cols : 0;
-        ImGui::Dummy({cols * size, rows * size});
+        ImGui::Dummy({cols * kOuterSize, rows * kOuterSize});
 
-        margin_w = std::max(0.0f, std::floor((avail.x - (cols * size)) / 2.0f));
-        margin_h = std::max(0.0f, std::floor((avail.y - (rows * size)) / 2.0f));
+        margin_w = std::max(0.0f, std::floor((avail.x - (cols * kOuterSize)) / 2.0f));
+        margin_h = std::max(0.0f, std::floor((avail.y - (rows * kOuterSize)) / 2.0f));
+        const float scroll_y = ImGui::GetScrollY();
 
-        const float sy = ImGui::GetScrollY();
-        const float sh = avail.y;
-        const int row_start = (int)(std::floor(sy / (size + kSpacing)));
-        const int row_end = (int)(std::ceil(sy / (size + kSpacing)) + std::ceil(sh / (size + kSpacing)));
-        const int frame = ImGui::GetFrameCount();
-
-        for (int row = row_start; row < std::min(rows, row_end); ++row) {
+        int row = (int)(std::floor(scroll_y / kOuterSize));
+        int row_end = std::min((int)(std::ceil(scroll_y / kOuterSize) +
+                                     std::ceil(avail.y / kOuterSize)),
+            rows);
+        for (; row < row_end; ++row) {
           for (int col = 0; col < cols; ++col) {
             const int index = row * cols + col;
             if (index >= m.cwd_entries.size()) {
@@ -299,11 +299,11 @@ void View::renderImGui() {
             const std::string& path = m.cwd_entries[index];
 
             ImGui::SetCursorPos({
-                col * size + margin_w,
-                row * size + margin_h,
+                col * kOuterSize + margin_w,
+                row * kOuterSize + margin_h,
             });
             const ImVec2 prev = ImGui::GetCursorPos();
-            ImGui::Dummy({size - 1, size - 1});
+            ImGui::Dummy({kOuterSize - 1, kOuterSize - 1});
             const ImVec2 next = ImGui::GetCursorPos();
             const ImVec2 p0 = ImGui::GetItemRectMin();
             const ImVec2 p1 = ImGui::GetItemRectMax();
@@ -336,11 +336,12 @@ void View::renderImGui() {
             // ImGui::PopTextWrapPos();
             // ImGui::SetCursorPos(next);
 
-            if (auto sp = i.PrefetchThumbnail(path)) {
+            assert(m.thumbnail_size > 0);
+            if (auto sp = i.PrefetchThumbnail(path, m.thumbnail_size)) {
               sp->target_x = p0.x;
               sp->target_y = p0.y;
-              sp->target_width = size;
-              sp->target_height = size;
+              sp->target_width = kOuterSize;
+              sp->target_height = kOuterSize;
               sp->last_shown_frame = ImGui::GetFrameCount();
             }
           }
@@ -411,7 +412,7 @@ void View::renderContent() {
 }
 
 void View::renderThumbnail() {
-  for (auto thumbnail : m.thumbnails) {
+  for (const auto& [path, thumbnail] : m.thumbnails) {
     if (!thumbnail->texture || !thumbnail->mesh) {
       continue;
     }

@@ -234,7 +234,7 @@ void Engine::Draw() {
     return a < b;
   });
 
-  auto view = world_.view<Render>();
+  static auto view = world_.view<Render>();
   view.each([&](const entt::entity e, const Render& re) {
     using namespace linalg;
 

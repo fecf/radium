@@ -40,7 +40,7 @@ public:
   float content_rotate = 0.0f;
 
   bool thumbnail_show = false;
-  int thumbnail_size = 0;
+  int thumbnail_size = 128;
   float thumbnail_alpha = 0.9f;
   float thumbnail_scroll = 0.0f;
 
@@ -75,7 +75,7 @@ public:
 
     entt::entity e;
   };
-  std::vector<std::shared_ptr<Thumbnail>> thumbnails;
+  std::unordered_map<std::string, std::shared_ptr<Thumbnail>> thumbnails;
 };
 
 struct Intent {
@@ -131,7 +131,7 @@ struct Intent {
 
   void Dispatch(Action a);
   std::shared_ptr<Model::Content> PrefetchContent(const std::string& path);
-  std::shared_ptr<Model::Thumbnail> PrefetchThumbnail(const std::string& path);
+  std::shared_ptr<Model::Thumbnail> PrefetchThumbnail(const std::string& path, int size);
   void EvictUnusedContent();
   void EvictUnusedThumbnail();
 

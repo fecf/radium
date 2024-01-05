@@ -632,10 +632,10 @@ void Device::CreateDeviceResources() {
 
   rtv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 0, 16, false));
   dsv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, 1, false));
-  srv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16, 1024, false));
+  srv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16, 40000, false));
   sampler_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2, 2, true));
   for (int i = 0; i < kInflightFrameCount; ++i) {
-    srv_heap_[i] = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16, 1024, true));
+    srv_heap_[i] = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16, 40000, true));
   }
   cmd_list_ = std::unique_ptr<CommandList>(new CommandList(d3d_, D3D12_COMMAND_LIST_TYPE_DIRECT));
   render_queue_ = std::unique_ptr<CommandQueue>(new CommandQueue(d3d_.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT));

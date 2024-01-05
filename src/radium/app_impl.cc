@@ -225,10 +225,8 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
 }
 
 std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
-    const std::string& path) {
-  auto it = std::find_if(m.thumbnails.begin(), m.thumbnails.end(),
-      [=](std::shared_ptr<Model::Thumbnail> c) { return c->path == path; });
-  if (it == m.thumbnails.end()) {
+    const std::string& path, int size) {
+  if (!m.thumbnails.contains(path)) {
     auto thumbnail = std::shared_ptr<Model::Thumbnail>(
         new Model::Thumbnail(), [](auto* ptr) {
           world().destroy(ptr->e);
@@ -236,12 +234,11 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
         });
     thumbnail->path = path;
     thumbnail->e = world().create();
-    m.thumbnails.emplace_back(thumbnail);
+    m.thumbnails.emplace(path, thumbnail);
 
     pool.Post([=, c = std::weak_ptr<Model::Thumbnail>(thumbnail)] {
-      std::this_thread::sleep_for(std::chrono::milliseconds(16));
       if (auto sp = c.lock()) {
-        sp->texture = ServiceLocator::Get<CachedImageProvider>()->Request(sp->path, 512);
+        sp->texture = ServiceLocator::Get<CachedImageProvider>()->Request(sp->path, size);
         if (!sp->texture) {
           return;
         }
@@ -253,7 +250,7 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
     });
     return thumbnail;
   } else {
-    return (*it);
+    return m.thumbnails[path];
   }
 }
 
@@ -285,13 +282,9 @@ void Intent::EvictUnusedContent() {
 }
 
 void Intent::EvictUnusedThumbnail() {
-  auto it = std::remove_if(
-      m.thumbnails.begin(), m.thumbnails.end(), [=](std::shared_ptr<Model::Thumbnail> c) {
-        return ImGui::GetFrameCount() - c->last_shown_frame > 3;
-      });
-  if (it != m.thumbnails.end()) {
-    m.thumbnails.erase(it, m.thumbnails.end());
-  }
+  std::erase_if(m.thumbnails, [=](const auto& item) {
+    return ImGui::GetFrameCount() - item.second->last_shown_frame > 3;
+  });
 }
 
 void Model::PushMRU(const std::string& path) {
