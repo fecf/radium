@@ -331,7 +331,7 @@ std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec)
       return {};
     }
   }
-  return rad::to_string(fspath.u8string());
+  return rad::to_string(fspath.wstring());
 }
 
 std::string GetFullPath(const std::string& path) noexcept {

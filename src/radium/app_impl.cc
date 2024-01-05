@@ -147,7 +147,7 @@ void Intent::openImpl(const std::string& path) {
   engine().GetWindow()->SetTitle(title.c_str());
 
   std::error_code ec;
-  std::filesystem::path fspath = rad::ConvertToCanonicalPath(path, ec);
+  std::filesystem::path fspath = rad::to_wstring(rad::ConvertToCanonicalPath(path, ec));
   if (ec) return;
   m.cwd = rad::to_string(fspath.make_preferred().u8string());
 
