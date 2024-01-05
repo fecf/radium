@@ -336,7 +336,8 @@ void View::renderImGui() {
     ImGui::SetNextWindowPos({16, 16});
     ImGui::SetNextWindowSize({800, 800});
     if (ImGui::Begin("debug", 0,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs)) {
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+                ImGuiWindowFlags_NoFocusOnAppearing)) {
       if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableNextColumn();
 
