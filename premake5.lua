@@ -72,7 +72,7 @@ project (name)
         "/utf-8",
     }
     editandcontinue "On"
-    vectorextensions "avx"
+    vectorextensions "avx2"
 
     filter {"platforms:x64"}
         system "Windows"
