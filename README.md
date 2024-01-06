@@ -17,6 +17,7 @@ Download [v0.3.0](https://github.com/fecf/radium/releases/download/0.3.0/radium.
 ### Usage
 - Menu: RightClick
 - Open: RightClick, Ctrl+O
+- Thumbnail: Space
 - Rotate: Shift+W, Shift+R
 - Zoom: Ctrl+WheelUp/Down, Ctrl+1~4, Ctrl+0
 - Pan: MiddleClick+Drag
