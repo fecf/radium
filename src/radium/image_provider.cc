@@ -79,7 +79,7 @@ CachedImageProvider::value_t CachedImageProvider::get(const key_t& key) {
 
 std::shared_ptr<rad::Texture> TiledImageProvider::Request(const std::string& path) {
   std::shared_ptr<rad::Image> image = rad::Image::Load(path);
-  if (!image) return nullptr;
+  if (!image || image->width() == 0 || image->height() == 0) return nullptr;
 
   std::shared_ptr<rad::Texture> texture = engine().CreateTexture(image, true);
   if (!texture) return nullptr;

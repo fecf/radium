@@ -11,12 +11,12 @@
 namespace rad {
 
 ImageRWFactory::ImageRWFactory() {
+  defines_.emplace_back(new ImageRWDefine<WuffsRW>("WuffsRW", {".jpeg", ".jpg", ".png"}));
   defines_.emplace_back(new ImageRWDefine<LibJpegTurboRW>("LibJpegTurbo", {".jpeg", ".jpg"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
   defines_.emplace_back(new ImageRWDefine<StbRW>("StbRW", {".jpg", ".jpeg", ".tga", ".png", ".bmp", ".psd", ".gif", ".hdr", ".pic", ".pnm"}));
   defines_.emplace_back(new ImageRWDefine<WicRW>("WicRW", {".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".png", ".bmp", ".jxr", ".ico"}));
-  defines_.emplace_back(new ImageRWDefine<WuffsRW>("WuffsRW", {".png"}));
 }
 
 std::unique_ptr<ImageDecoder> ImageRWFactory::CreatePreferredImageRW(

@@ -13,6 +13,8 @@ namespace rad {
 inline size_t getPitch(ImageFormat format, int width) noexcept {
   if (format == ImageFormat::RGBA8) {
     return width * 4;
+  } else if (format == ImageFormat::BGRA8) {
+    return width * 4;
   } else if (format == ImageFormat::RGBA16) {
     return width * 2 * 4;
   } else if (format == ImageFormat::RGBA32F) {
@@ -218,7 +220,7 @@ std::unique_ptr<Image> Image::Resize(
   }
 
   size_t dst_stride = 0;
-  if (format_ == ImageFormat::RGBA8) {
+  if (format_ == ImageFormat::RGBA8 || format_ == ImageFormat::BGRA8) {
     resizeNN<uchar4>(reinterpret_cast<const uchar4*>(data_),
         reinterpret_cast<uchar4*>(dst), width_, height_, dst_width, dst_height);
     dst_stride = dst_width * sizeof(uchar4);

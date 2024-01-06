@@ -4,7 +4,7 @@
 
 #define WUFFS_IMPLEMENTATION
 #define WUFFS_CONFIG__STATIC_FUNCTIONS
-#include <wuffs-unsupported-snapshot.c>
+#include <wuffs-0.4.c>
 
 namespace rad {
 
@@ -34,7 +34,7 @@ std::unique_ptr<Image> WuffsRW::Read(const uint8_t* data, size_t size) {
   size_t stride = res.pixbuf.plane(0).stride;
 
   std::unique_ptr<Image> image(
-      new Image(width, height, stride, ImageFormat::RGBA8, 4, ColorSpace::sRGB,
+      new Image(width, height, stride, ImageFormat::BGRA8, 4, ColorSpace::sRGB,
           ptr, [](void* ptr) { delete ptr; }));
 
   res.pixbuf_mem_owner.release();
