@@ -363,8 +363,6 @@ class Device {
   std::map<int, std::weak_ptr<Resource>> resource_map_;
   std::unique_ptr<ResourceDestructor> destructor_;
   std::atomic<int> resource_id_;
-
-  ThreadPool pool_;
 };
 
 }  // namespace gfx

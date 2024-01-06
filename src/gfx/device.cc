@@ -1644,86 +1644,78 @@ std::shared_ptr<Resource> Device::CreateRenderTarget(
 void Device::UploadResource2DBatch(
     std::shared_ptr<Resource> dst, const std::vector<UploadDesc>& descs) {
   for (const auto& desc : descs) {
-    // pool_.Post([res = std::weak_ptr<Resource>(dst), desc, this] {
-      std::shared_ptr<CommandSubmission> cs = cmd_list_->Get();
-      ComPtr<ID3D12GraphicsCommandList> cmdlist = cs->cmd_list;
+    std::shared_ptr<CommandSubmission> cs = cmd_list_->Get();
+    ComPtr<ID3D12GraphicsCommandList> cmdlist = cs->cmd_list;
 
-      const uint8_t* src = desc.src;
-      int src_pitch = desc.src_pitch;
-      int src_width_in_bytes = desc.src_width_in_bytes;
-      int src_height = desc.src_height;
-      int dst_subresource_index = desc.dst_subresource_index;
-      int dst_x_in_bytes = desc.dst_x;
-      int dst_y = desc.dst_y;
+    const uint8_t* src = desc.src;
+    int src_pitch = desc.src_pitch;
+    int src_width_in_bytes = desc.src_width_in_bytes;
+    int src_height = desc.src_height;
+    int dst_subresource_index = desc.dst_subresource_index;
+    int dst_x_in_bytes = desc.dst_x;
+    int dst_y = desc.dst_y;
 
-      // std::shared_ptr<Resource> dst = res.lock();
-      // if (!dst) {
-      //   return;
-      // }
+    D3D12_RESOURCE_DESC res_desc = dst->resource->GetDesc();
+    ComPtr<ID3D12Resource> staging;
+    ComPtr<D3D12MA::Allocation> staging_alloc;
+    D3D12MA::ALLOCATION_DESC staging_alloc_desc{};
+    staging_alloc_desc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_RESOURCE_DESC staging_res_desc =
+        CD3DX12_RESOURCE_DESC::Buffer(dst->size);
+    allocator_->CreateResource(&staging_alloc_desc, &staging_res_desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &staging_alloc,
+        IID_PPV_ARGS(&staging));
+    staging->SetName(L"Staging");
+    staging_alloc->SetName(L"StagingAllocation");
 
-      D3D12_RESOURCE_DESC res_desc = dst->resource->GetDesc();
-      ComPtr<ID3D12Resource> staging;
-      ComPtr<D3D12MA::Allocation> staging_alloc;
-      D3D12MA::ALLOCATION_DESC staging_alloc_desc{};
-      staging_alloc_desc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-      D3D12_RESOURCE_DESC staging_res_desc =
-          CD3DX12_RESOURCE_DESC::Buffer(dst->size);
-      allocator_->CreateResource(&staging_alloc_desc, &staging_res_desc,
-          D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &staging_alloc,
-          IID_PPV_ARGS(&staging));
-      staging->SetName(L"Staging");
-      staging_alloc->SetName(L"StagingAllocation");
+    uint8_t* mapped = nullptr;
+    CD3DX12_RANGE range{};
+    THROW_IF_FAILED(staging->Map(0, &range, (void**)&mapped));
+    if (((int)dst->pitch == src_pitch) &&
+        ((int)dst->pitch == src_width_in_bytes) &&
+        ((int)res_desc.Height == src_height) && (dst_x_in_bytes == 0) &&
+        (dst_y == 0)) {
+      ::memcpy_s(mapped, dst->size, src, src_pitch * src_height);
+    } else {
+      int avail_dst_height = std::max(0, (int)res_desc.Height - dst_y);
+      int avail_dst_width = std::max(0, (int)dst->pitch - dst_x_in_bytes);
+      int copy_height = std::min(src_height, avail_dst_height);
+      int copy_width = std::min(src_width_in_bytes, avail_dst_width);
+      assert((int)dst->pitch >= copy_width);
 
-      uint8_t* mapped = nullptr;
-      CD3DX12_RANGE range{};
-      THROW_IF_FAILED(staging->Map(0, &range, (void**)&mapped));
-      if (((int)dst->pitch == src_pitch) &&
-          ((int)dst->pitch == src_width_in_bytes) &&
-          ((int)res_desc.Height == src_height) && (dst_x_in_bytes == 0) &&
-          (dst_y == 0)) {
-        ::memcpy_s(mapped, dst->size, src, src_pitch * src_height);
-      } else {
-        int avail_dst_height = std::max(0, (int)res_desc.Height - dst_y);
-        int avail_dst_width = std::max(0, (int)dst->pitch - dst_x_in_bytes);
-        int copy_height = std::min(src_height, avail_dst_height);
-        int copy_width = std::min(src_width_in_bytes, avail_dst_width);
-        assert((int)dst->pitch >= copy_width);
-
-        for (int y = 0; y < copy_height; ++y) {
-          ::memcpy_s(mapped + ((y + dst_y) * dst->pitch) + (dst_x_in_bytes),
-              avail_dst_width, src + (y * src_pitch), copy_width);
-        }
+      for (int y = 0; y < copy_height; ++y) {
+        ::memcpy_s(mapped + ((y + dst_y) * dst->pitch) + (dst_x_in_bytes),
+            avail_dst_width, src + (y * src_pitch), copy_width);
       }
-      staging->Unmap(0, NULL);
+    }
+    staging->Unmap(0, NULL);
 
-      if (res_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
-        D3D12_RESOURCE_BARRIER barrier0 = CD3DX12_RESOURCE_BARRIER::Transition(
-            staging.Get(), D3D12_RESOURCE_STATE_GENERIC_READ,
-            D3D12_RESOURCE_STATE_COPY_SOURCE);
-        cmdlist->ResourceBarrier(1, &barrier0);
+    if (res_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
+      D3D12_RESOURCE_BARRIER barrier0 = CD3DX12_RESOURCE_BARRIER::Transition(
+          staging.Get(), D3D12_RESOURCE_STATE_GENERIC_READ,
+          D3D12_RESOURCE_STATE_COPY_SOURCE);
+      cmdlist->ResourceBarrier(1, &barrier0);
 
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
-        d3d_->GetCopyableFootprints(&res_desc, dst_subresource_index, 1, 0,
-            &footprint, NULL, NULL, NULL);
-        CD3DX12_TEXTURE_COPY_LOCATION dst_loc(
-            dst->resource.Get(), dst_subresource_index);
-        CD3DX12_TEXTURE_COPY_LOCATION src_loc(staging.Get(), footprint);
-        cmdlist->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, nullptr);
+      D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+      d3d_->GetCopyableFootprints(
+          &res_desc, dst_subresource_index, 1, 0, &footprint, NULL, NULL, NULL);
+      CD3DX12_TEXTURE_COPY_LOCATION dst_loc(
+          dst->resource.Get(), dst_subresource_index);
+      CD3DX12_TEXTURE_COPY_LOCATION src_loc(staging.Get(), footprint);
+      cmdlist->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, nullptr);
 
-        D3D12_RESOURCE_BARRIER barrier1 = CD3DX12_RESOURCE_BARRIER::Transition(
-            dst->resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dst_subresource_index);
-        cmdlist->ResourceBarrier(1, &barrier1);
-      } else {
-        D3D12_RESOURCE_DESC staging_res_desc = staging->GetDesc();
-        cmdlist->CopyBufferRegion(dst->resource.Get(), 0, staging.Get(), 0,
-            staging_res_desc.DepthOrArraySize);
-      }
-      copy_queue_->Dispatch(cs);
-      copy_queue_->WaitForIdle();
-    // });
+      D3D12_RESOURCE_BARRIER barrier1 = CD3DX12_RESOURCE_BARRIER::Transition(
+          dst->resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+          D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dst_subresource_index);
+      cmdlist->ResourceBarrier(1, &barrier1);
+    } else {
+      D3D12_RESOURCE_DESC staging_res_desc = staging->GetDesc();
+      cmdlist->CopyBufferRegion(dst->resource.Get(), 0, staging.Get(), 0,
+          staging_res_desc.DepthOrArraySize);
+    }
+    copy_queue_->Dispatch(cs);
+    copy_queue_->WaitForIdle();
   }
-  pool_.Wait();
 }
 
 }  // namespace gfx
