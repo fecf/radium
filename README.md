@@ -1,8 +1,8 @@
 # Radium
 Radium is an minimal image viewer for Windows.  
 
-<img src="https://github.com/fecf/radium/assets/6128431/8b8c7aea-0206-470a-8f11-e6572f68a16a" height="300">
-<img src="https://github.com/fecf/radium/assets/6128431/7f3d4e89-c1b8-444b-a85b-4f92fa6598da" height="300">
+<img src="https://github.com/fecf/radium/assets/6128431/8b8c7aea-0206-470a-8f11-e6572f68a16a" height="200">
+<img src="https://github.com/fecf/radium/assets/6128431/7f3d4e89-c1b8-444b-a85b-4f92fa6598da" height="200">
 
 ### Download
 - [radium.exe](https://github.com/fecf/radium/releases/download/0.3.0/radium.exe) v0.3.0 (2024/01/07)
