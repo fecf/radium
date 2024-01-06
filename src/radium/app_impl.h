@@ -28,11 +28,12 @@ public:
   struct Content;
 
   void PushMRU(const std::string& path);
-  const std::shared_ptr<Content> GetLatestContent() const;
+  const std::shared_ptr<Content> GetContent() const;
+  const std::shared_ptr<Content> GetPresentContent() const;
 
 public:
   std::string content_path;
-  std::string latest_content_path;
+  std::string present_content_path;
 
   float content_zoom = 1.0f;
   float content_cx = 0.0f;
@@ -55,6 +56,7 @@ public:
     std::shared_ptr<rad::Texture> texture;
     std::shared_ptr<rad::Mesh> mesh;
     std::chrono::system_clock::time_point timestamp;
+    bool completed = false;
 
     int source_width = 0;
     int source_height = 0;
@@ -144,7 +146,6 @@ private:
 
   App& a;
   Model& m;
-  rad::ThreadPool pool;
 };
 
 struct View {

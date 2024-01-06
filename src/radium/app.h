@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 
+#include <base/thread.h>
 #include <engine/window.h>
 
 namespace rad {
@@ -36,8 +37,11 @@ class App {
   void Start(int argc, char** argv);
   void PostDeferredTask(std::function<void()> func);
 
-  enum FontType { Small, Normal, Proggy };
+  enum FontType { Normal, Small, Large, Proggy };
   ImFont* GetFont(FontType font);
+
+  rad::ThreadPool pool_content;
+  rad::ThreadPool pool_thumbnail;
 
  private:
   void setupImGui();

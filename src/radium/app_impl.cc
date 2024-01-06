@@ -59,7 +59,7 @@ void Intent::Dispatch(Action action) {
       },
       [&](const Refresh& e) { openImpl(m.content_path); },
       [&](const Fit& e) {
-        if (auto content = m.GetLatestContent()) {
+        if (auto content = m.GetPresentContent()) {
           m.content_zoom =
               rad::scale_to_fit(content->source_width, content->source_height,
                   engine().GetWindow()->GetClientRect().width,
@@ -103,7 +103,7 @@ void Intent::Dispatch(Action action) {
         m.content_cx = 0;
         m.content_cy = 0;
         m.content_rotate = 0;
-        if (auto content = m.GetLatestContent()) {
+        if (auto content = m.GetPresentContent()) {
           if (auto texture = content->texture) {
             m.content_zoom =
                 rad::scale_to_fit(content->source_width, content->source_height,
@@ -181,8 +181,14 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
     const std::string& path) {
   auto prefetchFinished = [=](const std::string& path) {
     if (m.content_path == path) {
-      m.latest_content_path = path;
-      Dispatch(Reset{});
+      auto it = std::find_if(m.contents.begin(), m.contents.end(),
+          [=](const std::shared_ptr<Model::Content>& c) {
+            return c->path == path;
+          });
+      if (it != m.contents.end()) {
+        m.present_content_path = path;
+        Dispatch(Reset{});
+      }
     }
   };
 
@@ -200,18 +206,18 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
     content->e = world().create();
     m.contents.emplace_back(content);
 
-    pool.Post([=, c = std::weak_ptr<Model::Content>(content)] {
+    a.pool_content.Post([=, c = std::weak_ptr<Model::Content>(content)] {
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       if (auto sp = c.lock()) {
         sp->texture = ServiceLocator::Get<TiledImageProvider>()->Request(sp->path);
-        if (!sp->texture) {
-          return;
+        if (sp->texture) {
+          sp->source_width = sp->texture->array_src_width();
+          sp->source_height = sp->texture->array_src_height();
         }
-        sp->source_width = sp->texture->array_src_width();
-        sp->source_height = sp->texture->array_src_height();
-        sp->timestamp = std::chrono::system_clock::now();
         sp->mesh = engine().CreateMesh();
-        prefetchFinished(path);
+        sp->timestamp = std::chrono::system_clock::now();
+        sp->completed = true;
+        a.PostDeferredTask([=] { prefetchFinished(path); });
       } else {
         LOG_F(INFO, "task (%s) already deleted", path.c_str());
       }
@@ -237,7 +243,7 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
     thumbnail->e = world().create();
     m.thumbnails.emplace(path, thumbnail);
 
-    pool.Post([=, c = std::weak_ptr<Model::Thumbnail>(thumbnail)] {
+    a.pool_thumbnail.Post([=, c = std::weak_ptr<Model::Thumbnail>(thumbnail)] {
       if (auto sp = c.lock()) {
         sp->texture = ServiceLocator::Get<CachedImageProvider>()->Request(sp->path, size);
         if (!sp->texture) {
@@ -273,7 +279,7 @@ void Intent::EvictUnusedContent() {
       m.contents.begin(), m.contents.end(), [=](std::shared_ptr<Model::Content> c) {
         return 
           c->path != m.content_path && 
-          c->path != m.latest_content_path && 
+          c->path != m.present_content_path && 
           c->path != next && 
           c->path != prev;
       });
@@ -299,10 +305,18 @@ void Model::PushMRU(const std::string& path) {
   }
 }
 
-const std::shared_ptr<Model::Content> Model::GetLatestContent() const {
+const std::shared_ptr<Model::Content> Model::GetContent() const {
   auto it = std::find_if(contents.begin(), contents.end(),
       [this](const std::shared_ptr<Content> a) {
-        return a->path == latest_content_path;
+        return a->path == content_path;
+      });
+  return it != contents.end() ? (*it) : nullptr;
+}
+
+const std::shared_ptr<Model::Content> Model::GetPresentContent() const {
+  auto it = std::find_if(contents.begin(), contents.end(),
+      [this](const std::shared_ptr<Content> a) {
+        return a->path == present_content_path;
       });
   return it != contents.end() ? (*it) : nullptr;
 }

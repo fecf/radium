@@ -6,6 +6,7 @@
 #include <base/platform.h>
 
 #include "material_symbols.h"
+#include "imgui_widgets.h"
 
 void View::Update() {
   i.EvictUnusedContent();
@@ -146,7 +147,7 @@ void View::renderImGui() {
     if (ImGui::BeginPopup("##popup")) {
       if (ImGui::MenuItem("Open File ...")) {
         ImGui::CloseCurrentPopup();
-        a.PostDeferredTask([this] { openDialog(); });
+        openDialog();
       }
       if (ImGui::BeginMenu("Open Recent", !m.mru.empty())) {
         std::optional<std::string> selected;
@@ -166,7 +167,7 @@ void View::renderImGui() {
         ImGui::EndMenu();
       }
       if (ImGui::MenuItem("Open in explorer ...")) {
-        i.Dispatch(Intent::OpenInExplorer{m.latest_content_path});
+        i.Dispatch(Intent::OpenInExplorer{m.present_content_path});
       }
       ImGui::EndPopup();
     }
@@ -174,6 +175,26 @@ void View::renderImGui() {
         ImGui::IsMouseClicked(ImGuiMouseButton_Right, false)) {
       ImGui::OpenPopup("##popup");
     }
+
+    if (auto content = m.GetContent()) {
+      if (!content->completed) {
+        // loading
+        float radius = 16.0f;
+        ImGui::SetCursorPos((ImGui::GetContentRegionAvail() / 2.0f) - ImVec2(radius, radius));
+        Spinner(radius, 4.0f, 32, 1.0f, 0xcc909090);
+      } else if (!content->texture) {
+        // failed
+        ImGui::PushFont(a.GetFont(App::Large));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.25f, 1.0f));
+        ImVec2 size = ImGui::CalcTextSize(ICON_MD_ERROR " Failed to load");
+        ImGui::SetCursorPos(
+            (ImGui::GetContentRegionAvail() / 2.0f) - size / 2.0f);
+        ImGui::Text("%s Failed to load.", ICON_MD_ERROR);
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+      }
+    }
+
     ImGui::End();
   }
 
@@ -293,7 +314,6 @@ void View::renderImGui() {
         }
         ImGui::EndChild();
       }
-
       ImVec2 size = ImGui::CalcTextSize(m.cwd.c_str());
       ImGui::SetCursorPos({
           ImGui::GetContentRegionAvail().x / 2.0f - size.x / 2.0f,
@@ -314,8 +334,8 @@ void View::renderImGui() {
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration |
                 ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing)) {
 
-      ImGui::Text("%s  %s", ICON_MD_PHOTO, m.latest_content_path.c_str());
-      if (auto content = m.GetLatestContent()) {
+      ImGui::Text("%s  %s", ICON_MD_PHOTO, m.present_content_path.c_str());
+      if (auto content = m.GetPresentContent()) {
         ImGui::Text("%s  %d x %d", ICON_MD_STRAIGHTEN, content->source_width, content->source_height);
         ImGui::SameLine(0.0, 8.0f);
         ImGui::Text("%s  %.2fx", ICON_MD_ZOOM_IN, m.content_zoom);
@@ -362,7 +382,7 @@ void View::renderImGui() {
 
         ImGui::Text("Current Path");
         ImGui::TableNextColumn();
-        ImGui::Text("%s", m.latest_content_path.c_str());
+        ImGui::Text("%s", m.present_content_path.c_str());
         ImGui::TableNextColumn();
 
         ImGui::Text("Current Directory");
@@ -404,21 +424,21 @@ void View::renderImGui() {
       ImGui::End();
     }
   }
-
-
 }
 
 void View::renderContent() {
   for (auto content : m.contents) {
-    if (!content->texture || !content->mesh) {
-      continue;
-    }
-
     rad::Render& render = world().get_or_emplace<rad::Render>(content->e);
-    if (content->path != m.latest_content_path) {
-      render.bypass = true;
-      continue;
-    }
+    render.bypass = true;
+  }
+
+  std::shared_ptr<Model::Content> content = m.GetContent();
+  if (!content || content->completed == false) {
+    content = m.GetPresentContent();
+  }
+
+  if (content) {
+    rad::Render& render = world().get_or_emplace<rad::Render>(content->e);
     render.bypass = false;
     render.priority = 0;
     render.alpha = m.thumbnail_show ? 0.1f : 1.0f;

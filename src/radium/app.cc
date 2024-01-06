@@ -55,7 +55,11 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-App::App() : i(Intent(*this, m)), v(View(*this, m, i)) {}
+App::App()
+    : i(Intent(*this, m)),
+      v(View(*this, m, i)),
+      pool_content(1),
+      pool_thumbnail(std::thread::hardware_concurrency()) {}
 
 void App::Start(int argc, char** argv) {
   loadSettings();
@@ -214,6 +218,7 @@ void App::buildImGuiFonts() {
 
   void* icon_ttf = (void*)___src_radium_embed_ms_regular_ttf;
   int icon_ttf_size = (int)___src_radium_embed_ms_regular_ttf_len;
+
   {
     ImFontConfig config;
     config.OversampleH = 3;
@@ -247,7 +252,26 @@ void App::buildImGuiFonts() {
     io.Fonts->AddFontFromMemoryTTF(
         icon_ttf, icon_ttf_size, 24.0f, &config, icon_ranges);
   }
-  io.Fonts->AddFontDefault();  // 2 = Proggy
+
+  {
+    ImFontConfig config;
+    config.OversampleH = 3;
+    config.FontDataOwnedByAtlas = false;
+    config.RasterizerMultiply = 1.0f;
+    config.GlyphOffset.y = -1;
+    config.FontNo = 1;
+    ImFont* font = io.Fonts->AddFontFromFileTTF(
+        font_path.c_str(), 32.0f, &config, character_ranges);
+    config.MergeMode = true;
+    config.GlyphOffset.y = 6;
+    config.RasterizerMultiply = 1.2f;
+    config.FontNo = 0;
+    io.Fonts->AddFontFromMemoryTTF(
+        icon_ttf, icon_ttf_size, 38.0f, &config, icon_ranges);
+  }
+
+  io.Fonts->AddFontDefault();  // Proggy
+
   io.Fonts->Build();
 }
 
@@ -270,8 +294,10 @@ ImFont* App::GetFont(FontType font) {
     return ImGui::GetIO().Fonts->Fonts[0];
   } else if (font == FontType::Small) {
     return ImGui::GetIO().Fonts->Fonts[1];
-  } else if (font == FontType::Proggy) {
+  } else if (font == FontType::Large) {
     return ImGui::GetIO().Fonts->Fonts[2];
+  } else if (font == FontType::Proggy) {
+    return ImGui::GetIO().Fonts->Fonts[3];
   } else {
     return ImGui::GetIO().Fonts->Fonts[0];
   }
