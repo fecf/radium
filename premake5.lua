@@ -52,6 +52,7 @@ project (name)
         "jpeg.lib",
         "turbojpeg.lib",
         "yuv.lib",
+        "aom.lib",
     }
     flags { 
          "MultiProcessorCompile",

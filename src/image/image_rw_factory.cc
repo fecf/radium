@@ -2,6 +2,7 @@
 
 #include <cassert>
 
+#include "libavif_rw.h"
 #include "libjpegturbo_rw.h"
 #include "pnm_rw.h"
 #include "stb_rw.h"
@@ -13,6 +14,7 @@ namespace rad {
 ImageRWFactory::ImageRWFactory() {
   defines_.emplace_back(new ImageRWDefine<WuffsRW>("WuffsRW", {".jpeg", ".jpg", ".png"}));
   defines_.emplace_back(new ImageRWDefine<LibJpegTurboRW>("LibJpegTurbo", {".jpeg", ".jpg"}));
+  defines_.emplace_back(new ImageRWDefine<LibAvifRW>("LibAvif", {".avif"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
   defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
   defines_.emplace_back(new ImageRWDefine<StbRW>("StbRW", {".jpg", ".jpeg", ".tga", ".png", ".bmp", ".psd", ".gif", ".hdr", ".pic", ".pnm"}));
