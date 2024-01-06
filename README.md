@@ -1,17 +1,17 @@
 # Radium
 Radium is an minimal image viewer for Windows.
 
-Download [v0.2.1](https://github.com/fecf/radium/releases/download/0.2.1/radium.exe) (2024/01/05)
+Download [v0.3.0](https://github.com/fecf/radium/releases/download/0.3.0/radium.exe) (2024/01/07)
 
 ### Features
 - Zero configuration
 - Distraction-free user interface
 - No install required, single binary file
-- Supports many formats (jpeg, png, bmp, gif, tiff, psd, jxr, ico, pnm, pgm, ppm, pic, tga)
+- Supports many formats (avif, jpeg, png, bmp, gif, tiff, psd, jxr, ico, pnm, pgm, ppm, pic, tga)
 - Supports over 32K resolution losslessly
 
 ### Plans
-- [ ] Supports HDR format
+- [ ] Supports over 10-bit & HDR format
 - [ ] Supports layered format
 
 ### Usage
