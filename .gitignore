@@ -403,3 +403,5 @@ build/generated
 !build/tools
 temp/
 !src/debug
+
+vcpkg_installed

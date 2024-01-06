@@ -1,0 +1,8 @@
+{
+  "name": "radium",
+  "version": "1.0",
+  "dependencies": [
+    { "name": "libavif" },
+    { "name": "libjpeg-turbo" }
+  ]
+}

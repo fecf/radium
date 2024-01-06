@@ -23,3 +23,8 @@ Image
 Thumbnail (16x16 ~ 512x512)  
 <img src="https://github.com/fecf/radium/assets/6128431/7f3d4e89-c1b8-444b-a85b-4f92fa6598da" width="600">
 
+### Build
+- git clone https://github.com/fecf/radium && cd radium
+- vcpkg install --triplet x64-windows-static
+- premake5 vs2022
+- open build/radium.sln

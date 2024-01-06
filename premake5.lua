@@ -26,7 +26,6 @@ project (name)
         "src/third_party/directx-headers/include",
         "src/third_party/imgui",
         "src/third_party/imgui/backends",
-        "src/third_party/libjpeg-turbo/include",
         "src/third_party/linalg",
         "src/third_party/nlohmann",
         "src/third_party/pnm",
@@ -35,17 +34,24 @@ project (name)
         "src/third_party/wuffs",
         "src/third_party/entt",
         "build/generated",
+        "vcpkg_installed/x64-windows-static/include",
     }
     removefiles {
         "temp/**",
         "src/third_party/directx-headers/include/**.h",
         "src/third_party/wuffs/**.c"
     }
+    libdirs {
+        "vcpkg_installed/x64-windows-static/lib",
+    }
     links {
         "d3d12.lib",
         "dxgi.lib",
         "dxguid.lib",
-        "src/third_party/libjpeg-turbo/lib/turbojpeg-static.lib",
+        "avif.lib",
+        "jpeg.lib",
+        "turbojpeg.lib",
+        "yuv.lib",
     }
     flags { 
          "MultiProcessorCompile",
