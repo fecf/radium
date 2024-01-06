@@ -88,6 +88,10 @@ void View::renderImGui() {
         }
       }
 
+      if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        i.Dispatch(Intent::ToggleFullscreen{});
+      }
+
       static ImVec2 drag_start_offset{};
       static ImVec2 drag_start_mouse_pos{};
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
