@@ -73,6 +73,7 @@ void View::renderImGui() {
   const ImGuiIO& io = ImGui::GetIO();
   ImGui::SetNextWindowPos({0, 0});
   ImGui::SetNextWindowSize(io.DisplaySize);
+  ImGui::PushStyleVar(ImGuiStyleVar_Alpha, m.thumbnail_show ? 0.15f : 1.0f);
   if (ImGui::Begin("##content", 0, ImGuiWindowFlags_NoDecoration)) {
     if (ImGui::IsWindowFocused()) {
       if (ImGui::GetIO().MouseWheel > 0) {
@@ -176,27 +177,31 @@ void View::renderImGui() {
       ImGui::OpenPopup("##popup");
     }
 
-    if (auto content = m.GetContent()) {
-      if (!content->completed) {
-        // loading
-        float radius = 16.0f;
-        ImGui::SetCursorPos((ImGui::GetContentRegionAvail() / 2.0f) - ImVec2(radius, radius));
-        Spinner(radius, 4.0f, 32, 1.0f, 0xcc909090);
-      } else if (!content->texture) {
-        // failed
-        ImGui::PushFont(a.GetFont(App::Large));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.25f, 1.0f));
-        ImVec2 size = ImGui::CalcTextSize(ICON_MD_ERROR " Failed to load");
-        ImGui::SetCursorPos(
-            (ImGui::GetContentRegionAvail() / 2.0f) - size / 2.0f);
-        ImGui::Text("%s Failed to load.", ICON_MD_ERROR);
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+    if (!m.thumbnail_show) {
+      if (auto content = m.GetContent()) {
+        if (!content->completed) {
+          // loading
+          float radius = 16.0f;
+          ImGui::SetCursorPos(
+              (ImGui::GetContentRegionAvail() / 2.0f) - ImVec2(radius, radius));
+          Spinner(radius, 4.0f, 32, 1.0f, 0xcc909090);
+        } else if (!content->texture) {
+          // failed
+          ImGui::PushFont(a.GetFont(App::Large));
+          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.25f, 1.0f));
+          ImVec2 size = ImGui::CalcTextSize(ICON_MD_ERROR " Failed to load");
+          ImGui::SetCursorPos(
+              (ImGui::GetContentRegionAvail() / 2.0f) - size / 2.0f);
+          ImGui::Text("%s Failed to load.", ICON_MD_ERROR);
+          ImGui::PopStyleColor();
+          ImGui::PopFont();
+        }
       }
     }
 
     ImGui::End();
   }
+  ImGui::PopStyleVar();
 
   // thumbnail
   if (m.thumbnail_show) {
