@@ -339,15 +339,13 @@ class WindowImpl : public rad::Window {
         if (state_ == State::Normal && !fullscreen_) {
           window_rect_.x = rect.left;
           window_rect_.y = rect.top;
-          window_rect_.width = rect.right - rect.left;
-          window_rect_.height = rect.bottom - rect.top;
         }
         ::GetClientRect(hwnd, &rect);
+        if (client_rect_.x != rect.left || client_rect_.y != rect.top) {
+          dispatchEvent(window_event::Move{rect.left, rect.top});
+        }
         client_rect_.x = rect.left;
         client_rect_.y = rect.top;
-        client_rect_.width = rect.right - rect.left;
-        client_rect_.height = rect.bottom - rect.top;
-        dispatchEvent(window_event::Move{rect.left, rect.top});
         break;
       }
       case WM_SIZE: {
@@ -361,9 +359,11 @@ class WindowImpl : public rad::Window {
         }
         int width = LOWORD(lparam);
         int height = HIWORD(lparam);
-        client_rect_.width = width;
-        client_rect_.height = height;
-        dispatchEvent(window_event::Resize{width, height});
+        if (width > 0 && height > 0 && (width != client_rect_.width || height != client_rect_.height)) {
+          client_rect_.width = width;
+          client_rect_.height = height;
+          dispatchEvent(window_event::Resize{width, height});
+        }
         break;
       }
       case WM_ERASEBKGND:
@@ -372,13 +372,19 @@ class WindowImpl : public rad::Window {
         break;
       case WM_EXITSIZEMOVE: {
         RECT rect{};
-        ::GetClientRect(hwnd, &rect);
-        client_rect_.width = rect.right - rect.left;
-        client_rect_.height = rect.bottom - rect.top;
         ::GetWindowRect(hwnd, &rect);
+        window_rect_.x = rect.left;
+        window_rect_.y = rect.top;
         window_rect_.width = rect.right - rect.left;
         window_rect_.height = rect.bottom - rect.top;
-        dispatchEvent(window_event::Resize{client_rect_.width, client_rect_.height});
+        ::GetClientRect(hwnd, &rect);
+        int width = rect.right - rect.left;
+        int height = rect.bottom - rect.top;
+        if (width != client_rect_.width || height != client_rect_.height) {
+          client_rect_.width = width;
+          client_rect_.height = height;
+          dispatchEvent(window_event::Resize{client_rect_.width, client_rect_.height});
+        }
         break;
       }
       case WM_SYSCOMMAND:

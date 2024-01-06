@@ -85,6 +85,9 @@ void App::Start(int argc, char** argv) {
     }
     engine().GetWindow()->AddEventListener(
         [=](rad::window_event::window_event_t data) -> bool {
+          if (auto resize = std::get_if<rad::window_event::Resize>(&data)) {
+            PostDeferredTask([this] { i.Dispatch(Intent::Fit{}); });
+          }
           if (auto event_dnd =
                   std::get_if<rad::window_event::DragDrop>(&data)) {
             if (!event_dnd->value.empty()) {

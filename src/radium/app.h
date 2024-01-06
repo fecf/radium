@@ -49,7 +49,7 @@ class App {
 
  private:
   Config config_;
-  std::mutex mutex_;
+  std::recursive_mutex mutex_;
   std::queue<std::function<void()>> deferred_tasks_;
   std::unique_ptr<rad::Texture> imgui_font_atlas_;
 
