@@ -5,7 +5,7 @@
 #include "material_symbols.h"
 
 void View::renderImGuiOverlay() {
-  if (!m.overlay_show) {
+  if (!m.overlay_show || m.thumbnail_show) {
     return;
   }
 
