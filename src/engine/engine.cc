@@ -28,17 +28,15 @@ namespace rad {
 Texture::Texture(std::shared_ptr<gfx::Resource> resource, int width, int height,
     ColorSpace color_space, int array_size, int array_src_width,
     int array_src_height)
-    : resource_(resource),
-      width_(width),
-      height_(height),
-      color_space_(color_space),
-      array_size_(array_size),
-      array_src_width_(array_src_width),
-      array_src_height_(array_src_height) {}
+    : resource(resource),
+      width(width),
+      height(height),
+      color_space(color_space),
+      array_size(array_size),
+      array_src_width(array_src_width),
+      array_src_height(array_src_height) {}
 
-uint64_t Texture::id() const {
-  return static_cast<uint64_t>(resource_->id);
-}
+uint64_t Texture::id() const { return (uint64_t)resource->id; }
 
 Engine::Engine() : rendering_(false) {}
 
@@ -283,16 +281,16 @@ void Engine::Draw() {
     dc.mvp = mvp;
 
     if (re.mesh) {
-      dc.vertex_buffer = re.mesh->vertex();
-      dc.vertex_count  = re.mesh->vertex_count();
-      dc.vertex_start  = re.mesh->vertex_start();
-      dc.index_buffer  = re.mesh->index();
-      dc.index_start   = re.mesh->index_start();
+      dc.vertex_buffer = re.mesh->vertex_buffer;
+      dc.vertex_count  = re.mesh->vertex_count;
+      dc.vertex_start  = re.mesh->vertex_start;
+      dc.index_buffer  = re.mesh->index_buffer;
+      dc.index_start   = re.mesh->index_start;
 
       if (re.texture) {
-        dc.shader_resource  = re.texture->resource();
-        dc.array_src_width  = re.texture->array_src_width();
-        dc.array_src_height = re.texture->array_src_height();
+        dc.shader_resource  = re.texture->resource;
+        dc.array_src_width  = re.texture->array_src_width;
+        dc.array_src_height = re.texture->array_src_height;
 
         Constants constants{};
         constants.alpha = re.alpha;

@@ -901,7 +901,21 @@ void Device::CreateDeviceResources() {
 
   // create compose vertex buffer
   {
-    std::vector<InputLayout> data = CreateQuad(2.0f);  // -1.0f ~ 1.0f
+    std::vector<InputLayout> data(6);
+    const float s = 1.0f;  // -1.0f ~ 1.0f
+    const float z = 0.1f;
+    data[0].pos = {-s, +s, z, 0.0f};
+    data[1].pos = {+s, -s, z, 0.0f};
+    data[2].pos = {-s, -s, z, 0.0f};
+    data[0].uv = {0.0f, 0.0f};
+    data[1].uv = {1.0f, 1.0f};
+    data[2].uv = {0.0f, 1.0f};
+    data[3].pos = {+s, -s, z, 0.0f};
+    data[4].pos = {-s, +s, z, 0.0f};
+    data[5].pos = {+s, +s, z, 0.0f};
+    data[3].uv = {1.0f, 1.0f};
+    data[4].uv = {0.0f, 0.0f};
+    data[5].uv = {1.0f, 0.0f};
     compose_quad_vb_ = CreateDynamicBuffer(sizeof(InputLayout) * 6);
     compose_quad_vb_->Upload(data.data(), sizeof(InputLayout) * 6);
   }
@@ -1406,25 +1420,6 @@ void Device::renderImGuiResetContext(ComPtr<ID3D12GraphicsCommandList> ctx, ImDr
 
   const float blend_factor[4]{};
   ctx->OMSetBlendFactor(blend_factor);
-}
-
-std::vector<InputLayout> Device::CreateQuad(float scale) const {
-  std::vector<InputLayout> data(6);
-  const float s = scale / 2.0f;
-  const float z = 0.1f;
-  data[0].pos = {-s, +s, z, 0.0f};
-  data[1].pos = {+s, -s, z, 0.0f};
-  data[2].pos = {-s, -s, z, 0.0f};
-  data[0].uv = {0.0f, 0.0f};
-  data[1].uv = {1.0f, 1.0f};
-  data[2].uv = {0.0f, 1.0f};
-  data[3].pos = {+s, -s, z, 0.0f};
-  data[4].pos = {-s, +s, z, 0.0f};
-  data[5].pos = {+s, +s, z, 0.0f};
-  data[3].uv = {1.0f, 1.0f};
-  data[4].uv = {0.0f, 0.0f};
-  data[5].uv = {1.0f, 0.0f};
-  return data;
 }
 
 nlohmann::json Device::make_rhi_stats() const {

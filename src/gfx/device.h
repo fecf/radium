@@ -71,7 +71,7 @@ class Resource {
   Resource();
   virtual ~Resource();
 
-  int id;
+  uint64_t id;
   enum class Type {
     Buffer,
     VertexBuffer,
@@ -285,8 +285,6 @@ class Device {
   std::shared_ptr<Resource> CreateRenderTarget(
       int width, int height, DXGI_FORMAT format);
 
-  std::vector<InputLayout> CreateQuad(float scale) const;
-
   nlohmann::json make_rhi_stats() const;
   nlohmann::json make_device_stats() const;
 
@@ -360,9 +358,9 @@ class Device {
 
   // resource management
   mutable std::mutex mutex_resource_map_;
-  std::map<int, std::weak_ptr<Resource>> resource_map_;
+  std::map<uint64_t, std::weak_ptr<Resource>> resource_map_;
   std::unique_ptr<ResourceDestructor> destructor_;
-  std::atomic<int> resource_id_;
+  std::atomic<uint64_t> resource_id_;
 };
 
 }  // namespace gfx

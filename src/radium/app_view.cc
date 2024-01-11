@@ -476,11 +476,11 @@ void View::renderThumbnail() {
     render.mesh = thumbnail->mesh;
     render.texture = thumbnail->texture;
 
-    float scale = rad::scale_to_fit(thumbnail->texture->width(),
-        thumbnail->texture->height(), (int)thumbnail->target_width,
-        (int)thumbnail->target_height);
-    float scaled_w = thumbnail->texture->width() * scale;
-    float scaled_h = thumbnail->texture->height() * scale;
+    float scale =
+        rad::scale_to_fit(thumbnail->texture->width, thumbnail->texture->height,
+            (int)thumbnail->target_width, (int)thumbnail->target_height);
+    float scaled_w = thumbnail->texture->width * scale;
+    float scaled_h = thumbnail->texture->height * scale;
 
     float viewport_w = (float)engine().GetWindow()->GetClientRect().width;
     float viewport_h = (float)engine().GetWindow()->GetClientRect().height;
