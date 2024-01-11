@@ -156,11 +156,19 @@ void Intent::openImpl(const std::string& path) {
 
   std::filesystem::directory_iterator dir(fspath, ec);
   if (ec) return;
-  m.cwd_entries.clear();
+
+  // natural sort
+  std::vector<std::wstring> set;
   for (const auto& entry : dir) {
     if (entry.is_regular_file()) {
-      m.cwd_entries.emplace_back(rad::to_string(entry.path().u8string()));
+      set.push_back(entry.path().wstring());
     }
+  }
+  sort(set.begin(), set.end(), rad::natural_sort::sort);
+
+  m.cwd_entries.clear();
+  for (const auto& entry : set) {
+    m.cwd_entries.emplace_back(rad::to_string(entry));
   }
 
   PrefetchContent(fullpath);

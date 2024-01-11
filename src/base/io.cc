@@ -22,8 +22,8 @@ namespace rad {
 namespace comparer {
 
 bool name(const FileEntry& lhs, const FileEntry& rhs, bool desc) {
-  return desc ? compare(to_wstring(rhs.name()), to_wstring(lhs.name()))
-              : compare(to_wstring(lhs.name()), to_wstring(rhs.name()));
+  return desc ? rad::natural_sort::sort(to_wstring(rhs.name()), to_wstring(lhs.name()))
+              : rad::natural_sort::sort(to_wstring(lhs.name()), to_wstring(rhs.name()));
 }
 
 bool size(const FileEntry& lhs, const FileEntry& rhs, bool desc) {
