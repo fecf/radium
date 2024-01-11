@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include <wil/result.h>
+
 namespace rad {
 
 extern const std::string kNativeSeparator;
@@ -96,19 +98,19 @@ class FileStream {
   std::filesystem::path path_;
 };
 
-class FileReader {
+class MemoryMappedFile {
  public:
-  FileReader(const std::string& path, size_t prefetch_size = 1024 * 1024);
-  ~FileReader();
+  MemoryMappedFile(const std::string& path);
+  ~MemoryMappedFile();
 
-  const uint8_t* Read(size_t pos, size_t size);
-  size_t GetSize() const { return size_; }
+  void* data() const;
+  size_t size() const;
 
  private:
-  size_t pos_;
+  wil::unique_handle handle_file_;
+  wil::unique_handle handle_file_mapping_;
+  wil::unique_mapview_ptr<void> data_;
   size_t size_;
-  std::vector<uint8_t> prefetched_;
-  std::unique_ptr<FileStream> filestream_;
 };
 
 }  // namespace rad

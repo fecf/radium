@@ -275,42 +275,6 @@ size_t FileStream::Size() {
   return size.QuadPart;
 }
 
-FileReader::FileReader(const std::string& path, size_t prefetch_size)
-    : pos_(0) {
-  filestream_ = std::unique_ptr<FileStream>(new FileStream(path));
-  size_ = filestream_->Size();
-  pos_ = -1;
-  prefetched_.resize(prefetch_size, 0);
-
-  // Prefetch
-  Read(0, prefetch_size);
-}
-
-FileReader::~FileReader() {}
-
-const uint8_t* FileReader::Read(size_t pos, size_t size) {
-  if (pos > size_) {
-    return nullptr;
-  }
-
-  if (pos < pos_ || pos >= (pos_ + prefetched_.size())) {
-    size_t cache_size = prefetched_.size();
-    size_t aligned = pos / cache_size * cache_size;
-    if (pos_ != aligned) {
-      size_t after = filestream_->Seek(aligned);
-      if (after != aligned) {
-        throw std::runtime_error("failed Seek().");
-      }
-    }
-    pos_ = aligned;
-
-    size_t avail = size_ - pos;
-    size_t read_bytes = filestream_->Read(prefetched_.data(), std::min(avail, cache_size));
-  }
-
-  return prefetched_.data() + (pos - pos_);
-}
-
 std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec) noexcept {
   std::string fullpath = GetFullPath(path);
   if (fullpath.empty()) {
@@ -355,5 +319,38 @@ std::string GetFullPath(const std::string& path) noexcept {
   }
   return "";
 }
+
+MemoryMappedFile::MemoryMappedFile(const std::string& path) {
+  wil::unique_handle handle_file(::CreateFileW(to_wstring(path).c_str(), GENERIC_READ,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, 0));
+
+  LARGE_INTEGER size;
+  BOOL ret = ::GetFileSizeEx(handle_file.get(), &size);
+  size_ = ret ? size.QuadPart : 0;
+
+  DWORD high = size_ >> 32;
+  DWORD low = size_ & 0xffffffff;
+  wil::unique_handle handle_file_mapping(
+      ::CreateFileMappingW(handle_file.get(), 0, PAGE_READONLY, high, low, 0));
+
+  SYSTEM_INFO system_info{};
+  ::GetSystemInfo(&system_info);
+  size_t page_size = system_info.dwAllocationGranularity;
+
+  wil::unique_mapview_ptr<void> data(
+      ::MapViewOfFile(handle_file_mapping.get(), FILE_MAP_READ, 0, 0, size_));
+  if (data != NULL) {
+    handle_file_ = std::move(handle_file);
+    handle_file_mapping_ = std::move(handle_file_mapping);
+    data_ = std::move(data);
+  }
+}
+
+MemoryMappedFile::~MemoryMappedFile() {}
+
+void* MemoryMappedFile::data() const { return data_.get(); }
+
+size_t MemoryMappedFile::size() const { return size_; }
 
 }  // namespace rad
