@@ -236,7 +236,7 @@ std::string ShowSaveDialog(void* parent, const std::string& name,
 }
 
 bool OpenFolder(const std::string& path) {
-  std::filesystem::path fspath(path);
+  std::filesystem::path fspath(rad::to_wstring(path));
   std::error_code ec;
   if (!std::filesystem::exists(fspath, ec) || ec) {
     return false;

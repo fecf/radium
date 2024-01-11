@@ -1,5 +1,7 @@
 #include "algorithm.h"
 
+#include "text.h"
+
 namespace rad {
 
 namespace natural_sort {
@@ -26,21 +28,13 @@ namespace natural_sort {
   3. This notice may not be removed or altered from any source distribution.
 */
 
-typedef wchar_t nat_char;
+int nat_isdigit(nat_char a) { return iswdigit(a); }
 
-int strnatcmp(nat_char const* a, nat_char const* b);
+int nat_isspace(nat_char a) { return iswspace(a); }
 
-int strnatcasecmp(nat_char const* a, nat_char const* b);
+nat_char nat_toupper(nat_char a) { return towupper(a); }
 
-static inline int nat_isdigit(nat_char a) { return isdigit((unsigned char)a); }
-
-static inline int nat_isspace(nat_char a) { return isspace((unsigned char)a); }
-
-static inline nat_char nat_toupper(nat_char a) {
-  return toupper((unsigned char)a);
-}
-
-static int compare_right(nat_char const* a, nat_char const* b) {
+int compare_right(nat_char const* a, nat_char const* b) {
   int bias = 0;
 
   /* The longest run of digits wins.  That aside, the greatest
@@ -133,14 +127,6 @@ int strnatcmp(nat_char const* a, nat_char const* b) {
  *  */
 int strnatcasecmp(nat_char const* a, nat_char const* b) {
   return strnatcmp0(a, b, 1);
-}
-
-// You can use this function with std::sort and vector
-bool sort(const std::wstring& a, const std::wstring& b) {
-  if (strnatcasecmp(a.c_str(), b.c_str()) == -1)
-    return true;
-  else
-    return false;
 }
 
 }  // namespace natsort

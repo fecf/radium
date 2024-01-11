@@ -49,6 +49,7 @@ public:
   bool overlay_show = false;
 
   std::string cwd;
+  std::chrono::file_clock::time_point cwd_last_modified;
   std::vector<std::string> cwd_entries;
   std::deque<std::string> mru;
 

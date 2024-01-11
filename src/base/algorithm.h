@@ -97,7 +97,8 @@ struct remove_member_pointer<T C::*> {
 
 namespace natural_sort {
 
-bool sort(const std::wstring& a, const std::wstring& b);
+typedef wchar_t nat_char;
+int strnatcasecmp(nat_char const* a, nat_char const* b);
 
 }
 

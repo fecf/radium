@@ -139,36 +139,56 @@ void Intent::Dispatch(Action action) {
 }
 
 void Intent::openImpl(const std::string& path) {
+  // set content path
   std::string fullpath = rad::GetFullPath(path);
   if (fullpath.empty()) {
-    return;
+    fullpath = path;
   }
   m.content_path = fullpath;
   m.PushMRU(fullpath);
-  
+
+  // set window title
   std::string title = std::format("{} - {}", kAppName, fullpath);
   engine().GetWindow()->SetTitle(title.c_str());
 
+  // change cwd
+  std::filesystem::path fspath(rad::to_wstring(fullpath));
   std::error_code ec;
-  std::filesystem::path fspath = rad::to_wstring(rad::ConvertToCanonicalPath(path, ec));
-  if (ec) return;
-  m.cwd = rad::to_string(fspath.make_preferred().u8string());
-
-  std::filesystem::directory_iterator dir(fspath, ec);
-  if (ec) return;
-
-  // natural sort
-  std::vector<std::wstring> set;
-  for (const auto& entry : dir) {
-    if (entry.is_regular_file()) {
-      set.push_back(entry.path().wstring());
+  bool changed = false;
+  bool is_dir = std::filesystem::is_directory(fspath, ec);
+  if (!ec) {
+    if (!is_dir) fspath = fspath.parent_path();
+    std::string cwd = rad::to_string(fspath.wstring());
+    if (m.cwd != cwd) {
+      m.cwd = cwd;
+      changed = true;
     }
-  }
-  sort(set.begin(), set.end(), rad::natural_sort::sort);
 
-  m.cwd_entries.clear();
-  for (const auto& entry : set) {
-    m.cwd_entries.emplace_back(rad::to_string(entry));
+    std::filesystem::file_time_type modified =
+        std::filesystem::last_write_time(fspath, ec);
+    if (!ec && m.cwd_last_modified != modified) {
+      m.cwd_last_modified = modified;
+      changed = true;
+    }
+
+    if (changed) {
+      m.cwd_entries.clear();
+      std::filesystem::directory_iterator dir(fspath, ec);
+      for (const auto& entry : dir) {
+        if (entry.is_regular_file()) {
+          m.cwd_entries.emplace_back(rad::to_string(entry.path().wstring()));
+        }
+      }
+
+      std::sort(m.cwd_entries.begin(), m.cwd_entries.end(),
+          [](const std::string& a, const std::string& b) {
+            if (rad::natural_sort::strnatcasecmp(rad::to_wstring(a).c_str(),
+                    rad::to_wstring(b).c_str()) == -1)
+              return true;
+            else
+              return false;
+          });
+    }
   }
 
   PrefetchContent(fullpath);
@@ -182,9 +202,6 @@ void Intent::openImpl(const std::string& path) {
                                                       : std::next(it);
     prev = *itp;
     next = *itn;
-
-    
-
     PrefetchContent(prev);
     PrefetchContent(next);
   }
@@ -312,6 +329,10 @@ void Intent::EvictUnusedThumbnail() {
 }
 
 void Model::PushMRU(const std::string& path) {
+  if (path.empty()) {
+    return;
+  }
+
   auto it = std::remove(mru.begin(), mru.end(), path);
   if (it != mru.end()) {
     mru.erase(it, mru.end());

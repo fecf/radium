@@ -14,69 +14,6 @@ extern const std::string kNativeSeparator;
 std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec) noexcept;
 std::string GetFullPath(const std::string& path) noexcept;
 
-enum class SortType {
-  NameAsc,
-  NameDesc,
-  SizeAsc,
-  SizeDesc,
-  CreatedAsc,
-  CreatedDesc,
-  ModifiedAsc,
-  ModifiedDesc,
-};
-
-class FileEntry {
-  friend class DirectoryList;
-
- public:
-  FileEntry();
-  FileEntry(const std::string& path);
-
-  enum Flags {
-    None = 0, Directory, System, Hidden, 
-  };
-
-  bool valid() const { return valid_; }
-  const std::string& path() const { return path_; }
-  const std::string& name() const { return filename_; }
-  size_t size() const { return size_; }
-  std::chrono::system_clock::time_point created() const { return created_; }
-  std::chrono::system_clock::time_point modified() const { return modified_; }
-  int flags() const;
-
-private:
-  bool valid_;
-  std::string path_;
-  std::string filename_;
-  size_t size_;
-  std::chrono::system_clock::time_point created_;
-  std::chrono::system_clock::time_point modified_;
-  int flags_;
-};
-
-class DirectoryList {
- public:
-  DirectoryList();
-  DirectoryList(const std::string& path, bool include_subdirectories = false,
-      bool include_files = true);
-  ~DirectoryList();
-
-  const std::vector<FileEntry>& entries() const { return entries_; }
-  size_t count() const { return entries_.size(); }
-  const FileEntry& operator[](size_t pos) const { return entries_[pos]; }
-  const std::string& path() const { return path_; }
-
-  void sort(SortType type, bool desc);
-  SortType sortType() const { return sort_type_; }
-  bool sortDesc() const { return sort_desc_; }
-
- private:
-  std::string path_;
-  std::vector<FileEntry> entries_;
-  SortType sort_type_;
-  bool sort_desc_;
-};
-
 class FileStream {
  public:
   FileStream(const std::string& path);

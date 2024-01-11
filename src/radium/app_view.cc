@@ -498,5 +498,8 @@ void View::renderThumbnail() {
 void View::openDialog() {
   std::string path = rad::platform::ShowOpenFileDialog(
       engine().GetWindow()->GetHandle(), "Open File ...", m.content_path);
+  if (path.empty()) {
+    return;
+  }
   i.Dispatch(Intent::Open{path});
 }
