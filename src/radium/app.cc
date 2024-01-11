@@ -1,18 +1,13 @@
 #include "app.h"
 
-#include <base/io.h>
-#include <base/algorithm.h>
 #include <base/minlog.h>
 #include <base/platform.h>
 #include <base/text.h>
-#include <engine/engine.h>
 
-#include <fstream>
 #include <format>
-#include <numeric>
+#include <fstream>
 
 #include <json.hpp>
-
 
 #include "constants.h"
 #include "image_provider.h"
@@ -70,8 +65,8 @@ void App::Start(int argc, char** argv) {
   // Parallelising engine initialisation and font builds
   {
     auto initialize_service_locator_task = std::async(std::launch::async, [this] {
-      ServiceLocator::Provide(new CachedImageProvider());
-      ServiceLocator::Provide(new TiledImageProvider());
+      ServiceLocator::Provide(new ThumbnailImageProvider());
+      ServiceLocator::Provide(new ContentImageProvider());
     });
     auto build_imgui_fonts_task =
         std::async(std::launch::async, [this] { buildImGuiFonts(); });
@@ -229,7 +224,7 @@ void App::buildImGuiFonts() {
     ImFont* font = io.Fonts->AddFontFromFileTTF(
         font_path.c_str(), 21.0f, &config, character_ranges);
     config.MergeMode = true;
-    config.GlyphOffset.y = 4;
+    config.GlyphOffset.y = 5;
     config.RasterizerMultiply = 1.2f;
     config.FontNo = 0;
     io.Fonts->AddFontFromMemoryTTF(
@@ -281,11 +276,17 @@ void App::uploadImGuiFonts() {
   ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height, &bpp);
   assert((pixels != NULL) && (width > 0) && (height > 0) && (bpp == 4));
 
-  auto image = std::make_shared<rad::Image>(width, height, width * bpp,
-      rad::ImageFormat::RGBA8, 4, rad::ColorSpace::sRGB, pixels);
-  imgui_font_atlas_ = engine().CreateTexture(image);
-  ImTextureID texture_id =
-      reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());
+  std::unique_ptr<rad::Image> image(new rad::Image{
+      .width = width,
+      .height = height,
+      .stride = (size_t)width * bpp,
+      .buffer = rad::ImageBuffer::From(
+          pixels, width * bpp * height, [](void* ptr) { delete ptr; }),
+      .pixel_format = rad::PixelFormatType::rgba8,
+      .color_space = rad::ColorSpaceType::srgb,
+  });
+  imgui_font_atlas_ = engine().CreateTexture(image.get());
+  ImTextureID texture_id = reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());
   ImGui::GetIO().Fonts->SetTexID(texture_id);
 }
 

@@ -4,50 +4,38 @@
 #include <engine/engine.h>
 #include <image/image.h>
 
-std::shared_ptr<rad::Texture> ImageProvider::Request(
-    const std::string& path, std::optional<int> max_size) {
-  std::shared_ptr<rad::Image> image = rad::Image::Load(path);
-  if (!image) return nullptr;
-
-  if (max_size) {
-    float scale = rad::scale_to_fit(
-        image->width(), image->height(), *max_size, *max_size);
-    if (scale != 1.0f) {
-      image = image->Resize((int)std::ceil(image->width() * scale),
-        (int)std::ceil(image->height() * scale), rad::ResizeFilter::Bilinear);
-      if (!image) return nullptr;
-    }
-  }
-
-  std::shared_ptr<rad::Texture> texture = engine().CreateTexture(image, false);
-  if (!texture) return nullptr;
-
-  return texture;
-}
-
-
-std::shared_ptr<rad::Texture> CachedImageProvider::Request(
-  const std::string& path, std::optional<int> max_size) {
+std::shared_ptr<rad::Texture> ThumbnailImageProvider::Request(const std::string& path, int size) {
   auto cache = get(path);
   if (cache.texture) {
     return cache.texture;
   }
 
-  auto texture = ImageProvider::Request(path, max_size);
-  if (texture) {
-    put(path, {max_size.value_or(0), texture});
+  std::unique_ptr<rad::Image> image = rad::Image::Load(path);
+  if (!image) return nullptr;
+
+  float scale = rad::scale_to_fit(image->width, image->height, size, size);
+  if (scale != 1.0f) {
+    image = image->Resize((int)std::ceil(image->width * scale),
+        (int)std::ceil(image->height * scale),
+        rad::InterpolationType::Bilinear);
+    if (!image) return nullptr;
   }
+
+  std::shared_ptr<rad::Texture> texture = engine().CreateTexture(image.get(), false);
+  if (!texture) return nullptr;
+
+  put(path, {size, texture});
   return texture;
 }
 
-void CachedImageProvider::Clear() { 
+void ThumbnailImageProvider::Clear() { 
   std::lock_guard lock(mutex_);
 
   map_.clear();
   cache_.clear(); 
 }
 
-void CachedImageProvider::put(const key_t& key, const value_t& value) {
+void ThumbnailImageProvider::put(const key_t& key, const value_t& value) {
   std::lock_guard lock(mutex_);
 
   if (map_.contains(key)) {
@@ -63,7 +51,7 @@ void CachedImageProvider::put(const key_t& key, const value_t& value) {
   }
 }
 
-CachedImageProvider::value_t CachedImageProvider::get(const key_t& key) {
+ThumbnailImageProvider::value_t ThumbnailImageProvider::get(const key_t& key) {
   std::lock_guard lock(mutex_);
 
   if (!map_.contains(key)) {
@@ -77,12 +65,12 @@ CachedImageProvider::value_t CachedImageProvider::get(const key_t& key) {
   return v;
 }
 
-std::shared_ptr<rad::Texture> TiledImageProvider::Request(const std::string& path) {
-  std::shared_ptr<rad::Image> image = rad::Image::Load(path);
-  if (!image || image->width() == 0 || image->height() == 0) return nullptr;
+ContentImageProvider::Result ContentImageProvider::Request(const std::string& path) {
+  std::unique_ptr<rad::Image> image = rad::Image::Load(path);
+  if (!image || image->width == 0 || image->height == 0) return {};
 
-  std::shared_ptr<rad::Texture> texture = engine().CreateTexture(image, true);
-  if (!texture) return nullptr;
+  std::unique_ptr<rad::Texture> texture = engine().CreateTexture(image.get(), true);
+  if (!texture) return {};
 
-  return texture;
+  return {std::move(image), std::move(texture)};
 }

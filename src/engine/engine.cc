@@ -87,29 +87,29 @@ void Engine::Destroy() {
 
 Window* Engine::GetWindow() const { return window_.get(); }
 
-std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, bool tiled) {
+std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
   assert(image);
 
   DXGI_FORMAT dxgi_format;
   int bpp = 0;
-  if (image->format() == ImageFormat::BGRA8) {
+  if (image->pixel_format == PixelFormatType::bgra8) {
     dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
     bpp = 4;
-  } else if (image->format() == ImageFormat::RGBA16) {
+  } else if (image->pixel_format == PixelFormatType::rgba16) {
     dxgi_format = DXGI_FORMAT_R16G16B16A16_UNORM;
     bpp = 8;
-  } else if (image->format() == ImageFormat::RGBA32F) {
+  } else if (image->pixel_format == PixelFormatType::rgba32f) {
     dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     bpp = 16;
-  } else if (image->format() == ImageFormat::RGBA8) {
+  } else if (image->pixel_format == PixelFormatType::rgba8) {
     dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
     bpp = 4;
   }
 
   if (tiled) {
     int tile = kTileSize;
-    int rows = (image->height() + tile - 1) / tile;
-    int cols = (image->width() + tile - 1) / tile;
+    int rows = (image->height + tile - 1) / tile;
+    int cols = (image->width + tile - 1) / tile;
     int array_size = rows * cols;
 
     std::shared_ptr<gfx::Resource> resource =
@@ -126,8 +126,8 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
         int dst_offset_y = 0;
         int src_offset_x = tile * x;
         int src_offset_y = tile * y;
-        int src_remain_width = std::max(0, image->width() - src_offset_x);
-        int src_remain_height = std::max(0, image->height() - src_offset_y);
+        int src_remain_width = std::max(0, image->width - src_offset_x);
+        int src_remain_height = std::max(0, image->height - src_offset_y);
         int copy_width = std::max(0, std::min(src_remain_width, tile));
         int copy_height = std::max(0, std::min(src_remain_height, tile));
         assert(src_offset_x >= 0 && src_offset_y >= 0);
@@ -137,43 +137,45 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
 
         DXGI_FORMAT dxgi_format;
         int bpp = 0;
-        if (image->format() == ImageFormat::BGRA8) {
+        if (image->pixel_format == PixelFormatType::bgra8) {
           dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
           bpp = 4;
-        } else if (image->format() == ImageFormat::RGBA16) {
+        } else if (image->pixel_format == PixelFormatType::rgba16) {
           dxgi_format = DXGI_FORMAT_R16G16B16A16_UNORM;
           bpp = 8;
-        } else if (image->format() == ImageFormat::RGBA32F) {
+        } else if (image->pixel_format == PixelFormatType::rgba32f) {
           dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
           bpp = 16;
-        } else if (image->format() == ImageFormat::RGBA8) {
+        } else if (image->pixel_format == PixelFormatType::rgba8) {
           dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
           bpp = 4;
         } else {
           throw std::runtime_error("unsupported format.");
           return nullptr;
         }
-        int width_in_bytes = image->width() * bpp;
+        int width_in_bytes = image->width * bpp;
         size_t src_offset =
-            (src_offset_y * image->stride()) + (src_offset_x * bpp);
+            (src_offset_y * image->stride) + (src_offset_x * bpp);
 
         gfx::Device::UploadDesc desc{};
         desc.dst_subresource_index = y * cols + x;
         desc.dst_x = dst_offset_x * bpp;
         desc.dst_y = dst_offset_y;
-        desc.src = image->data() + src_offset;
+        desc.src = image->buffer->data + src_offset;
         desc.src_width_in_bytes = copy_width * bpp;
-        desc.src_pitch = (int)image->stride();
+        desc.src_pitch = (int)image->stride;
         desc.src_height = copy_height;
         descs.push_back(desc);
       }
     }
     device_->UploadResource2DBatch(resource, descs);
 
-    return std::make_unique<Texture>(resource, tile, tile, image->colorspace(), array_size, image->width(), image->height());
+    return std::make_unique<Texture>(resource, tile, tile,
+        (ColorSpace)image->color_space, array_size, image->width,
+        image->height);
   } else {
     std::shared_ptr<gfx::Resource> resource =
-        device_->CreateTexture(image->width(), image->height(), dxgi_format);
+        device_->CreateTexture(image->width, image->height, dxgi_format);
     if (!resource) {
       return nullptr;
     }
@@ -183,13 +185,13 @@ std::unique_ptr<Texture> Engine::CreateTexture(std::shared_ptr<Image> image, boo
     desc.dst_subresource_index = 0;
     desc.dst_x = 0;
     desc.dst_y = 0;
-    desc.src = image->data();
-    desc.src_width_in_bytes = image->width() * bpp;
-    desc.src_pitch = (int)image->stride();
-    desc.src_height = image->height();
+    desc.src = image->buffer->data;
+    desc.src_width_in_bytes = image->width * bpp;
+    desc.src_pitch = (int)image->stride;
+    desc.src_height = image->height;
     device_->UploadResource2DBatch(resource, {desc});
 
-    return std::make_unique<Texture>(resource, image->width(), image->height(), image->colorspace());
+    return std::make_unique<Texture>(resource, image->width, image->height, (ColorSpace)image->color_space);
   }
 }
 

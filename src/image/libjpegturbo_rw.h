@@ -6,10 +6,10 @@
 
 namespace rad {
 
-class LibJpegTurboRW : public ImageDecoder {
+class LibJpegTurboRW : public ImageDecoderBase {
  public:
   virtual ~LibJpegTurboRW() {}
-  virtual std::unique_ptr<Image> Read(const uint8_t* data, size_t size) override;
+  virtual std::unique_ptr<Image> Decode(const uint8_t* data, size_t size) override;
 };
 
 }  // namespace rad

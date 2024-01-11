@@ -35,7 +35,7 @@ struct membuf : std::streambuf {
   char *begin, *end;
 };
 
-std::unique_ptr<Image> PnmRW::Read(const uint8_t* data, size_t size) {
+std::unique_ptr<Image> PnmRW::Decode(const uint8_t* data, size_t size) {
   membuf membuf((char*)data, size);
   std::istream ifs(&membuf);
 
@@ -57,11 +57,18 @@ std::unique_ptr<Image> PnmRW::Read(const uint8_t* data, size_t size) {
   }
 
   const uint8_t* src = buf.data();
-  std::unique_ptr<Image> image(new Image(w, h, w * 4, ImageFormat::RGBA8, 3,
-      ColorSpace::sRGB));
+  std::unique_ptr<Image> image(new Image{
+      .width = w,
+      .height = h,
+      .stride = (size_t)w * 4,
+      .buffer = ImageBuffer::Alloc(w * h * 4),
+      .pixel_format = PixelFormatType::rgba8,
+      .color_space = ColorSpaceType::srgb,
+      .decoder = DecoderType::pnm,
+  });
 
   if (depth == 8) {
-    uint8_t* dst = image->data();
+    uint8_t* dst = image->buffer->data;
     if (ch == 1) {
       for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
@@ -81,7 +88,7 @@ std::unique_ptr<Image> PnmRW::Read(const uint8_t* data, size_t size) {
     }
   } else if (depth == 1) {
     const uint8_t* src = buf.data();
-    uint32_t* dst = (uint32_t*)image->data();
+    uint32_t* dst = (uint32_t*)image->buffer->data;
     if (ch == 1) {
       for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {

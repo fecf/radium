@@ -1,63 +1,107 @@
 #pragma once
 
+#include <cassert>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "types.h"
+#pragma once
 
 namespace rad {
 
+enum class DecoderType {
+  unknown,
+  libavif,
+  libjpegturbo,
+  stb,
+  pnm,
+  wic,
+  wuffs,
+};
+
+enum class FormatType {
+  unknown,
+  bmp,
+  jpg,
+};
+
+enum class PixelFormatType {
+  unknown,
+  rgba8 = 0,
+  rgba16,
+  rgba32f,
+  bgra8,
+};
+
+enum class ColorSpaceType {
+  unknown,
+  srgb,
+  linear,
+};
+
+enum class InterpolationType {
+  Nearest,
+  Bilinear,
+};
+
 class Image;
 
-class ImageDecoder {
+class ImageDecoderBase {
  public:
-  virtual ~ImageDecoder();
-  virtual std::unique_ptr<Image> Read(const uint8_t* data, size_t size);
+  virtual ~ImageDecoderBase();
+  virtual std::unique_ptr<Image> Decode(const std::string& path);
+  virtual std::unique_ptr<Image> Decode(const uint8_t* data, size_t size);
+};
+
+class ImageBuffer {
+ public:
+  ~ImageBuffer() {
+    if (deleter) {
+      deleter(data);
+    }
+  }
+  static std::shared_ptr<ImageBuffer> Alloc(size_t size) {
+    return std::shared_ptr<ImageBuffer>(new ImageBuffer{
+        .data = (uint8_t*)::malloc(size),
+        .size = size,
+        .deleter = ::free,
+    });
+  }
+  static std::shared_ptr<ImageBuffer> From(
+      uint8_t* data, size_t size, std::function<void(void*)> deleter) {
+    return std::shared_ptr<ImageBuffer>(new ImageBuffer{
+        .data = data,
+        .size = size,
+        .deleter = std::move(deleter),
+    });
+  }
+  uint8_t* data = nullptr;
+  size_t size = 0;
+  std::function<void(void*)> deleter = nullptr;
 };
 
 class Image {
-  friend class ImageDecoder;
+  friend class ImageDecoderBase;
 
  public:
   static std::unique_ptr<Image> Load(const uint8_t* data, size_t size, const char* ext);
   static std::unique_ptr<Image> Load(const std::string& path);
 
-  // Create empty image using allocated memory buffer
-  Image(int width, int height, size_t stride, ImageFormat format, int channels, ColorSpace cs);
-    
-  // Create empty image with external memory pointer and default deleter
-  Image(int width, int height, size_t stride, ImageFormat format, int channels,
-      ColorSpace cs, uint8_t* data);
-
-  // Create empty image with external memory pointer and custom deleter
-  Image(int width, int height, size_t stride, ImageFormat format, int channels,
-      ColorSpace cs, uint8_t* data, std::function<void(void*)> deleter);
-
   ~Image();
+  std::unique_ptr<Image> Resize(int width, int height, InterpolationType filter) const;
 
-  int width() const noexcept { return width_; }
-  int height() const noexcept { return height_; }
-  size_t stride() const noexcept { return stride_; }
-  ImageFormat format() const noexcept { return format_; }
-  int channels() const noexcept { return channels_; }
-  ColorSpace colorspace() const noexcept { return cs_; }
-  uint8_t* data() const noexcept { return data_; };
-  size_t size() const noexcept { return size_; }
-
-  std::unique_ptr<Image> Resize(int width, int height, ResizeFilter filter) const;
-
- private:
-  int width_;
-  int height_;
-  size_t stride_;
-  ImageFormat format_;
-  int channels_;
-  ColorSpace cs_;
-  uint8_t* data_;
-  size_t size_;
-  std::function<void(void*)> deleter_;
+ public:
+  int width = 0;
+  int height = 0;
+  size_t stride = 0;
+  std::shared_ptr<ImageBuffer> buffer;
+  FormatType format = FormatType::unknown;
+  PixelFormatType pixel_format = PixelFormatType::unknown;
+  ColorSpaceType color_space = ColorSpaceType::unknown;
+  DecoderType decoder = DecoderType::unknown;
+  std::vector<std::pair<std::string, std::string>> metadata;
 };
 
 }  // namespace rad

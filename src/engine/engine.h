@@ -5,6 +5,7 @@
 
 #include "window.h"
 #include "image/image.h"
+#include "engine/shader/primary.h"
 
 #include <linalg.h>
 using namespace linalg::aliases;
@@ -120,7 +121,7 @@ class Engine {
   void EndFrame();
   Window* GetWindow() const;
 
-  std::unique_ptr<Texture> CreateTexture(std::shared_ptr<Image> image, bool tiled = false);
+  std::unique_ptr<Texture> CreateTexture(const Image* image, bool tiled = false);
   std::unique_ptr<Mesh> CreateMesh();
 
  private:

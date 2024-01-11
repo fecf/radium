@@ -60,10 +60,12 @@ void Intent::Dispatch(Action action) {
       [&](const Refresh& e) { openImpl(m.content_path); },
       [&](const Fit& e) {
         if (auto content = m.GetPresentContent()) {
-          m.content_zoom =
-              rad::scale_to_fit(content->source_width, content->source_height,
-                  engine().GetWindow()->GetClientRect().width,
-                  engine().GetWindow()->GetClientRect().height);
+          if (content->image) {
+            m.content_zoom =
+                rad::scale_to_fit(content->image->width, content->image->height,
+                    engine().GetWindow()->GetClientRect().width,
+                    engine().GetWindow()->GetClientRect().height);
+          }
           m.content_cx = 0;
           m.content_cy = 0;
         }
@@ -104,9 +106,9 @@ void Intent::Dispatch(Action action) {
         m.content_cy = 0;
         m.content_rotate = 0;
         if (auto content = m.GetPresentContent()) {
-          if (auto texture = content->texture) {
+          if (auto image = content->image) {
             m.content_zoom =
-                rad::scale_to_fit(content->source_width, content->source_height,
+                rad::scale_to_fit(content->image->width, content->image->height,
                     engine().GetWindow()->GetClientRect().width,
                     engine().GetWindow()->GetClientRect().height);
           }
@@ -172,6 +174,9 @@ void Intent::openImpl(const std::string& path) {
                                                       : std::next(it);
     prev = *itp;
     next = *itn;
+
+    
+
     PrefetchContent(prev);
     PrefetchContent(next);
   }
@@ -197,10 +202,11 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
         return c->path == path;
       });
   if (it == m.contents.end()) {
-    auto content =
-        std::shared_ptr<Model::Content>(new Model::Content(), [](auto* ptr) {
-          world().destroy(ptr->e);
-          delete ptr;
+    auto content = std::shared_ptr<Model::Content>(new Model::Content(), [=](auto* ptr) {
+          a.PostDeferredTask([=] {
+            world().destroy(ptr->e);
+            delete ptr;
+          });
         });
     content->path = path;
     content->e = world().create();
@@ -209,11 +215,12 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
     a.pool_content.Post([=, c = std::weak_ptr<Model::Content>(content)] {
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       if (auto sp = c.lock()) {
-        sp->texture = ServiceLocator::Get<TiledImageProvider>()->Request(sp->path);
-        if (sp->texture) {
-          sp->source_width = sp->texture->array_src_width();
-          sp->source_height = sp->texture->array_src_height();
+        auto result = ServiceLocator::Get<ContentImageProvider>()->Request(sp->path);
+        sp->image = std::move(result.image);
+        if (sp->image) {
+          sp->image->buffer.reset();  // no need to use
         }
+        sp->texture = std::move(result.texture);
         sp->mesh = engine().CreateMesh();
         sp->timestamp = std::chrono::system_clock::now();
         sp->completed = true;
@@ -224,7 +231,7 @@ std::shared_ptr<Model::Content> Intent::PrefetchContent(
     });
     return content;
   } else {
-    if ((*it)->texture) {
+    if ((*it)->completed) {
       prefetchFinished(path);
     }
     return (*it);
@@ -235,9 +242,11 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
     const std::string& path, int size) {
   if (!m.thumbnails.contains(path)) {
     auto thumbnail = std::shared_ptr<Model::Thumbnail>(
-        new Model::Thumbnail(), [](auto* ptr) {
-          world().destroy(ptr->e);
-          delete ptr;
+        new Model::Thumbnail(), [=](auto* ptr) {
+          a.PostDeferredTask([=] {
+            world().destroy(ptr->e);
+            delete ptr;
+          });
         });
     thumbnail->path = path;
     thumbnail->e = world().create();
@@ -245,7 +254,7 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
 
     a.pool_thumbnail.Post([=, c = std::weak_ptr<Model::Thumbnail>(thumbnail)] {
       if (auto sp = c.lock()) {
-        sp->texture = ServiceLocator::Get<CachedImageProvider>()->Request(sp->path, size);
+        sp->texture = ServiceLocator::Get<ThumbnailImageProvider>()->Request(sp->path, size);
         if (!sp->texture) {
           return;
         }

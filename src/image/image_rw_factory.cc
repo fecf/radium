@@ -11,18 +11,9 @@
 
 namespace rad {
 
-ImageRWFactory::ImageRWFactory() {
-  defines_.emplace_back(new ImageRWDefine<WuffsRW>("WuffsRW", {".jpeg", ".jpg", ".png"}));
-  defines_.emplace_back(new ImageRWDefine<LibJpegTurboRW>("LibJpegTurbo", {".jpeg", ".jpg"}));
-  defines_.emplace_back(new ImageRWDefine<LibAvifRW>("LibAvif", {".avif"}));
-  defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
-  defines_.emplace_back(new ImageRWDefine<PnmRW>("PnmRW", {".pnm", ".pgm", ".ppm"}));
-  defines_.emplace_back(new ImageRWDefine<StbRW>("StbRW", {".jpg", ".jpeg", ".tga", ".png", ".bmp", ".psd", ".gif", ".hdr", ".pic", ".pnm"}));
-  defines_.emplace_back(new ImageRWDefine<WicRW>("WicRW", {".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".png", ".bmp", ".jxr", ".ico"}));
-}
+ImageRWFactory::ImageRWFactory() {}
 
-std::unique_ptr<ImageDecoder> ImageRWFactory::CreatePreferredImageRW(
-    const std::string& path) {
+std::unique_ptr<ImageDecoderBase> ImageRWFactory::Create(const std::string& path) {
   std::filesystem::path fspath((const char8_t*)path.c_str());
   std::string extension = fspath.extension().string();
   if (extension.empty()) {
@@ -32,31 +23,22 @@ std::unique_ptr<ImageDecoder> ImageRWFactory::CreatePreferredImageRW(
   std::transform(extension.begin(), extension.end(), extension.begin(),
       [](unsigned char c) { return std::tolower(c); });
 
-  for (const auto& define : defines_) {
-    auto it = std::find(
-        define->extensions().begin(), define->extensions().end(), extension);
-    if (it != define->extensions().end()) {
-      return define->create();
-    }
+  if (extension == ".bmp" || extension == ".gif" || extension == ".jpeg" ||
+      extension == ".jpg" || extension == ".png" || extension == ".tga") {
+    return std::make_unique<WuffsRW>();
   }
+  if (extension == ".avif") {
+    return std::make_unique<LibAvifRW>();
+  }
+  if (extension == ".psd" || extension == ".hdr" || extension == ".pic") {
+    return std::make_unique<StbRW>();
+  }
+  if (extension == ".tif" || extension == ".tiff" || extension == ".ico" ||
+      extension == ".jxr") {
+    return std::make_unique<WicRW>();
+  }
+
   return nullptr;
 }
-
-std::vector<std::string> ImageRWFactory::GetSupportedExtensions() {
-  std::vector<std::string> exts;
-
-  for (const auto& define : defines_) {
-    for (const auto& ext : define->extensions()) {
-      exts.push_back(ext);
-    }
-  }
-
-  std::sort(exts.begin(), exts.end());
-  auto it = std::unique(exts.begin(), exts.end());
-  exts.erase(it, exts.end());
-  return exts;
-}
-
-IImageRWDefine::~IImageRWDefine() {}
 
 }  // namespace rad

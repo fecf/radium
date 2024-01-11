@@ -2,7 +2,6 @@
 
 #include "base/io.h"
 #include "base/text.h"
-#include "image/types.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -13,43 +12,55 @@
 
 namespace rad {
 
-std::unique_ptr<Image> StbRW::Read(const uint8_t* data, size_t size) {
+std::unique_ptr<Image> StbRW::Decode(const uint8_t* data, size_t size) {
+  constexpr size_t kAssumedHeaderSize = 8192;
+  static_assert(sizeof(stbi_uc) == sizeof(uint8_t), "sizeof(stbi_uc) == sizeof(uint8_t).");
+
   // Decode header
   int x, y, comp;
-  {
-    constexpr size_t kAssumedHeaderSize = 8192;
-    size_t header_size = std::min(kAssumedHeaderSize, size);
-    stbi_info_from_memory(data, (int)header_size, &x, &y, &comp);
-  }
+  size_t header_size = std::min(kAssumedHeaderSize, size);
+  stbi_info_from_memory(data, (int)header_size, &x, &y, &comp);
+  bool is_hdr = stbi_is_hdr_from_memory(data, (int)header_size) > 0;
+  bool is_16bit = stbi_is_16_bit_from_memory(data, (int)header_size) > 0;
 
   // Decode data
-  uint8_t* decoded = nullptr;
-  ImageFormat format;
-  ColorSpace cs;
+  uint8_t* decoded_data = nullptr;
+  PixelFormatType pixel_format;
   size_t stride;
+  ColorSpaceType color_space;
 
-  int is_16bit = stbi_is_16_bit_from_memory(data, (int)size);
-  int is_hdr = stbi_is_hdr_from_memory(data, (int)size);
-  if (is_16bit) {
-    decoded = (uint8_t*)stbi_load_16_from_memory(data, (int)size, &x, &y, &comp, 4);
-    stride = x * 4 * 2;
-    format = ImageFormat::RGBA16;
-    cs = ColorSpace::sRGB;
+  if (is_hdr) {
+    decoded_data = (uint8_t*)stbi_loadf_from_memory(data, (int)size, &x, &y, &comp, 4);
+    stride = x * 4 * 4;
+    pixel_format = PixelFormatType::rgba32f;
+    color_space = ColorSpaceType::linear;
   } else {
-    static_assert(sizeof(stbi_uc) == sizeof(uint8_t),
-        "sizeof(stbi_uc) == sizeof(uint8_t).");
-    decoded = (uint8_t*)stbi_load_from_memory(data, (int)size, &x, &y, &comp, 4);
-    format = ImageFormat::RGBA8;
-    cs = ColorSpace::sRGB;
-    stride = x * 4;
+    if (is_16bit) {
+      decoded_data = (uint8_t*)stbi_load_16_from_memory(data, (int)size, &x, &y, &comp, 4);
+      stride = x * 4 * 2;
+      pixel_format = PixelFormatType::rgba16;
+      color_space = ColorSpaceType::srgb;
+    } else {
+      decoded_data = (uint8_t*)stbi_load_from_memory(data, (int)size, &x, &y, &comp, 4);
+      stride = x * 4;
+      pixel_format = PixelFormatType::rgba8;
+      color_space = ColorSpaceType::srgb;
+    }
   }
-  if (!decoded) {
+
+  if (!decoded_data) {
     return nullptr;
   }
 
-  std::unique_ptr<Image> image(
-      new Image(x, y, stride, format, 3, cs, decoded, ::stbi_image_free));
-  return image;
+  return std::unique_ptr<Image>(new Image{
+    .width = x,
+    .height = y,
+    .stride = stride,
+    .buffer = ImageBuffer::From(decoded_data, stride * y, stbi_image_free),
+    .pixel_format = pixel_format,
+    .color_space = color_space,
+    .decoder = DecoderType::stb,
+  });
 }
 
 }  // namespace rad

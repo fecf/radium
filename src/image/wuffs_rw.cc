@@ -8,7 +8,7 @@
 
 namespace rad {
 
-std::unique_ptr<Image> WuffsRW::Read(const uint8_t* data, size_t size) {
+std::unique_ptr<Image> WuffsRW::Decode(const uint8_t* data, size_t size) {
   class DecodeImageCallbacks : public wuffs_aux::DecodeImageCallbacks {
    private:
     std::string HandleMetadata(const wuffs_base__more_information& minfo,
@@ -23,9 +23,10 @@ std::unique_ptr<Image> WuffsRW::Read(const uint8_t* data, size_t size) {
           result, input, buffer, std::move(image_decoder));
     }
   };
-  DecodeImageCallbacks callbacks;
 
   wuffs_aux::sync_io::MemoryInput input(data, size);
+
+  DecodeImageCallbacks callbacks;
   wuffs_aux::DecodeImageResult res = wuffs_aux::DecodeImage(callbacks, input);
 
   int width = res.pixbuf.pixcfg.width();
@@ -33,10 +34,16 @@ std::unique_ptr<Image> WuffsRW::Read(const uint8_t* data, size_t size) {
   uint8_t* ptr = res.pixbuf.plane(0).ptr;
   size_t stride = res.pixbuf.plane(0).stride;
 
-  std::unique_ptr<Image> image(
-      new Image(width, height, stride, ImageFormat::BGRA8, 4, ColorSpace::sRGB,
-          ptr, [](void* ptr) { delete ptr; }));
-
+  std::unique_ptr<Image> image(new Image{
+      .width = width,
+      .height = height,
+      .stride = (size_t)width * 4,
+      .buffer = ImageBuffer::From(
+          ptr, width * height * 4, [](void* ptr) { delete ptr; }),
+      .pixel_format = PixelFormatType::bgra8,
+      .color_space = ColorSpaceType::srgb,
+      .decoder = DecoderType::wuffs,
+  });
   res.pixbuf_mem_owner.release();
 
   return image;

@@ -28,7 +28,7 @@ using namespace Microsoft::WRL;
 
 namespace rad {
 
-std::unique_ptr<Image> WicRW::Read(const uint8_t* data, size_t size) {
+std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
   try {
     ComPtr<IStream> filestream = ::SHCreateMemStream(data, (UINT)size);
     if (!filestream) {
@@ -69,8 +69,8 @@ std::unique_ptr<Image> WicRW::Read(const uint8_t* data, size_t size) {
     CHECK(pixel_format_info->GetChannelCount(&channels));
     CHECK(pixel_format_info->GetBitsPerPixel(&bpp));
 
-    ImageFormat format = ImageFormat::RGBA8;
-    ColorSpace cs = ColorSpace::sRGB;
+    PixelFormatType format = PixelFormatType::rgba8;
+    ColorSpaceType cs = ColorSpaceType::srgb;
 
     ComPtr<IWICFormatConverter> converter;
     CHECK(factory->CreateFormatConverter(&converter));
@@ -78,8 +78,8 @@ std::unique_ptr<Image> WicRW::Read(const uint8_t* data, size_t size) {
       CHECK(converter->Initialize(bitmap_frame.Get(),
           GUID_WICPixelFormat128bppRGBAFloat, WICBitmapDitherTypeNone, nullptr,
           0.0f, WICBitmapPaletteTypeCustom));
-      format = ImageFormat::RGBA32F;
-      cs = ColorSpace::Linear;
+      format = PixelFormatType::rgba32f;
+      cs = ColorSpaceType::linear;
     } else {
       CHECK(converter->Initialize(bitmap_frame.Get(),
           GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0f,
@@ -105,8 +105,17 @@ std::unique_ptr<Image> WicRW::Read(const uint8_t* data, size_t size) {
     uint8_t* buf = new uint8_t[stride * h];
     CHECK(bitmap->CopyPixels(&rect, stride, stride * h, buf));
 
-    return std::unique_ptr<Image>(new Image(w, h, stride, format, channels, cs,
-        buf, [](void* ptr) { delete[] ptr; }));
+    std::unique_ptr<Image> image(new Image{
+        .width = (int)w,
+        .height = (int)h,
+        .stride = (size_t)w * 4,
+        .buffer = ImageBuffer::From(buf, w * h * 4, [](void* ptr) { delete[] ptr; }),
+        .pixel_format = format,
+        .color_space = cs,
+        .decoder = DecoderType::wic,
+    });
+    return image;
+
   } catch (std::exception&) {
     return {};
   }

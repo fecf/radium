@@ -4,6 +4,7 @@
 #include <engine/engine.h>
 #include <base/algorithm.h>
 #include <base/platform.h>
+#include <base/text.h>
 
 #include "material_symbols.h"
 #include "imgui_widgets.h"
@@ -18,7 +19,6 @@ void View::Update() {
 
 void View::renderImGui() {
   ImGuiStyle& style = ImGui::GetStyle();
-
   style.FrameBorderSize = 0.0f;
   style.ChildBorderSize = 0.0f;
   style.WindowBorderSize = 0.0f;
@@ -332,25 +332,7 @@ void View::renderImGui() {
   }
 
   // overlay
-  if (m.overlay_show) {
-    ImGui::SetNextWindowPos({16, 16});
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0.9f));
-    if (ImGui::Begin("##overlay", 0,
-            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing)) {
-
-      ImGui::Text("%s  %s", ICON_MD_PHOTO, m.present_content_path.c_str());
-      if (auto content = m.GetPresentContent()) {
-        ImGui::Text("%s  %d x %d", ICON_MD_STRAIGHTEN, content->source_width, content->source_height);
-        ImGui::SameLine(0.0, 8.0f);
-        ImGui::Text("%s  %.2fx", ICON_MD_ZOOM_IN, m.content_zoom);
-        ImGui::Text("%s  %.2f deg", ICON_MD_ROTATE_RIGHT, m.content_rotate);
-      }
-
-      ImGui::End();
-    }
-    ImGui::PopStyleColor();
-  }
+  renderImGuiOverlay();
 
   // debug
 #ifdef _DEBUG
@@ -380,19 +362,19 @@ void View::renderImGui() {
         ImGui::Text("%f", ImGui::GetIO().DeltaTime);
         ImGui::TableNextColumn();
 
-        ImGui::Text("Path");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.content_path.c_str());
-        ImGui::TableNextColumn();
-
         ImGui::Text("Current Path");
         ImGui::TableNextColumn();
-        ImGui::Text("%s", m.present_content_path.c_str());
+        ImGui::Text("%s", m.content_path.c_str());
         ImGui::TableNextColumn();
 
         ImGui::Text("Current Directory");
         ImGui::TableNextColumn();
         ImGui::Text("%s", m.cwd.c_str());
+        ImGui::TableNextColumn();
+
+        ImGui::Text("Present Path");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", m.present_content_path.c_str());
         ImGui::TableNextColumn();
 
         ImGui::Text("Content Layout");
@@ -442,7 +424,7 @@ void View::renderContent() {
     content = m.GetPresentContent();
   }
 
-  if (content) {
+  if (content && content->image && content->texture) {
     rad::Render& render = world().get_or_emplace<rad::Render>(content->e);
     render.bypass = false;
     render.priority = 0;
@@ -450,8 +432,8 @@ void View::renderContent() {
     render.mesh = content->mesh;
     render.texture = content->texture;
 
-    float scaled_w = content->source_width * m.content_zoom;
-    float scaled_h = content->source_height * m.content_zoom;
+    float scaled_w = content->image->width * m.content_zoom;
+    float scaled_h = content->image->height * m.content_zoom;
     float theta = (float)(m.content_rotate * M_PI / 180.0f);
     float scaled_rw = abs(cos(theta) * scaled_w - sin(theta) * scaled_h);
     float scaled_rh = abs(sin(theta) * scaled_w + cos(theta) * scaled_h);
@@ -514,6 +496,7 @@ void View::renderThumbnail() {
 }
 
 void View::openDialog() {
-  std::string path = rad::platform::ShowOpenFileDialog(engine().GetWindow()->GetHandle(), "Open File ...");
+  std::string path = rad::platform::ShowOpenFileDialog(
+      engine().GetWindow()->GetHandle(), "Open File ...", m.content_path);
   i.Dispatch(Intent::Open{path});
 }

@@ -11,6 +11,7 @@
 class App;
 
 namespace rad {
+class Image;
 struct Texture;
 struct Mesh;
 }
@@ -53,13 +54,11 @@ public:
 
   struct Content {
     std::string path;
+    std::shared_ptr<rad::Image> image;
     std::shared_ptr<rad::Texture> texture;
     std::shared_ptr<rad::Mesh> mesh;
     std::chrono::system_clock::time_point timestamp;
     bool completed = false;
-
-    int source_width = 0;
-    int source_height = 0;
 
     entt::entity e;
   };
@@ -154,6 +153,7 @@ struct View {
 
  private:
   void renderImGui();
+  void renderImGuiOverlay();
   void renderContent();
   void renderThumbnail();
   void openDialog();

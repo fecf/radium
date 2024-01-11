@@ -6,10 +6,10 @@
 
 namespace rad {
 
-class WuffsRW : public ImageDecoder {
+class WuffsRW : public ImageDecoderBase {
  public:
   virtual ~WuffsRW() {}
-  virtual std::unique_ptr<Image> Read(const uint8_t* data, size_t size) override;
+  virtual std::unique_ptr<Image> Decode(const uint8_t* data, size_t size) override;
 };
 
 }  // namespace rad

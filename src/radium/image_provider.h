@@ -8,16 +8,9 @@
 
 #include <engine/engine.h>
 
-class ImageProvider {
+class ThumbnailImageProvider {
  public:
-  std::shared_ptr<rad::Texture> Request(
-      const std::string& path, std::optional<int> max_size = {});
-};
-
-class CachedImageProvider : public ImageProvider {
- public:
-  std::shared_ptr<rad::Texture> Request(
-      const std::string& path, std::optional<int> max_size = {});
+  std::shared_ptr<rad::Texture> Request(const std::string& path, int size);
   void Clear();
 
  private:
@@ -37,7 +30,11 @@ class CachedImageProvider : public ImageProvider {
   value_t get(const key_t& key);
 };
 
-class TiledImageProvider {
+class ContentImageProvider {
  public:
-  std::shared_ptr<rad::Texture> Request(const std::string& path);
+  struct Result {
+    std::unique_ptr<rad::Image> image;
+    std::unique_ptr<rad::Texture> texture;
+  };
+  Result Request(const std::string& path);
 };
