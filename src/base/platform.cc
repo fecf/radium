@@ -95,7 +95,7 @@ std::string errorMessage(unsigned long id) {
   return to_string(buf);
 }
 
-std::string ShowOpenFileDialog(void* parent, const std::string& name) {
+std::string ShowOpenFileDialog(void* parent, const std::string& name, const std::string& default_folder) {
   ComPtr<IFileOpenDialog> dialog;
   HRESULT hr;
   hr = ::CoCreateInstance(
@@ -107,6 +107,18 @@ std::string ShowOpenFileDialog(void* parent, const std::string& name) {
   hr = dialog->SetTitle(to_wstring(name).c_str());
   if (FAILED(hr)) {
     throw std::runtime_error("IFileOpenDialog::SetTitle().");
+  }
+
+  ComPtr<IShellItem> folder;
+  if (!default_folder.empty()) {
+    std::filesystem::path fspath = rad::to_wstring(default_folder);
+    if (fspath.has_parent_path()) fspath = fspath.parent_path();
+
+    hr = ::SHCreateItemFromParsingName(
+        fspath.wstring().c_str(), NULL, IID_PPV_ARGS(&folder));
+    if (SUCCEEDED(hr)) {
+      hr = dialog->SetFolder(folder.Get());
+    }
   }
 
   hr = dialog->Show((HWND)parent);
@@ -176,8 +188,8 @@ std::string ShowOpenFolderDialog(void* parent, const std::string& name) {
   return ret;
 }
 
-std::string ShowSaveDialog(
-    void* parent, const std::string& name, const std::string& extension) {
+std::string ShowSaveDialog(void* parent, const std::string& name,
+    const std::string& extension, const std::string& default_folder) {
   ComPtr<IFileSaveDialog> dialog;
 
   HRESULT hr = ::CoCreateInstance(
@@ -189,6 +201,18 @@ std::string ShowSaveDialog(
   hr = dialog->SetTitle(to_wstring(name).c_str());
   if (FAILED(hr)) {
     throw std::runtime_error("IFileSaveDialog::SetTitle().");
+  }
+
+  ComPtr<IShellItem> folder;
+  if (!default_folder.empty()) {
+    std::filesystem::path fspath = rad::to_wstring(default_folder);
+    if (fspath.has_parent_path()) fspath = fspath.parent_path();
+
+    hr = ::SHCreateItemFromParsingName(
+        fspath.wstring().c_str(), NULL, IID_PPV_ARGS(&folder));
+    if (SUCCEEDED(hr)) {
+      dialog->SetFolder(folder.Get());
+    }
   }
 
   hr = dialog->Show((HWND)parent);

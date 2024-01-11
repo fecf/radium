@@ -16,9 +16,11 @@ std::vector<std::string> getCommandLineArgs();
 std::string errorMessage(unsigned long win32_error_code);
 
 // Common Dialog
-std::string ShowOpenFileDialog(void* parent, const std::string& name);
+std::string ShowOpenFileDialog(void* parent, const std::string& name,
+    const std::string& default_folder = {});
 std::string ShowOpenFolderDialog(void* parent, const std::string& name);
-std::string ShowSaveDialog(void* parent, const std::string& name, const std::string& extension);
+std::string ShowSaveDialog(void* parent, const std::string& name,
+    const std::string& extension, const std::string& default_folder = {});
 
 // Shell
 bool OpenFolder(const std::string& dir);
