@@ -1,4 +1,4 @@
-// dear imgui, v1.90.1 WIP
+// dear imgui, v1.90.1
 // (drawing and font code)
 
 /*
@@ -1634,19 +1634,6 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
         clip_rect.z = ImMin(clip_rect.z, cpu_fine_clip_rect->z);
         clip_rect.w = ImMin(clip_rect.w, cpu_fine_clip_rect->w);
     }
-
-    static const ImVec2 offset[4] {
-        {+1.0f, 0.0f},
-        {-1.0f, 0.0f},
-        { 0.0f, +1.0f},
-        { 0.0f, -1.0f},
-    };
-    ImU32 shadow = 0xc0000000;
-    font->RenderText(this, font_size, {pos.x + offset[0].x, pos.y + offset[0].y}, shadow, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
-    font->RenderText(this, font_size, {pos.x + offset[1].x, pos.y + offset[1].y}, shadow, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
-    font->RenderText(this, font_size, {pos.x + offset[2].x, pos.y + offset[2].y}, shadow, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
-    font->RenderText(this, font_size, {pos.x + offset[3].x, pos.y + offset[3].y}, shadow, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
-
     font->RenderText(this, font_size, pos, col, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
 }
 
@@ -4218,8 +4205,8 @@ static unsigned int stb_decompress(unsigned char *output, const unsigned char *i
 //-----------------------------------------------------------------------------
 // ProggyClean.ttf
 // Copyright (c) 2004, 2005 Tristan Grimmer
-// MIT license (see License.txt in http://www.upperbounds.net/download/ProggyClean.ttf.zip)
-// Download and more information at http://upperbounds.net
+// MIT license (see License.txt in http://www.proggyfonts.net/index.php?menu=download)
+// Download and more information at http://www.proggyfonts.net or http://upperboundsinteractive.com/fonts.php
 //-----------------------------------------------------------------------------
 // File: 'ProggyClean.ttf' (41208 bytes)
 // Exported using misc/fonts/binary_to_compressed_c.cpp (with compression + base85 string encoding).
