@@ -183,8 +183,8 @@ bool App::saveSettings() {
   std::string path = getSettingsPath();
   config_.window_x = engine().GetWindow()->GetWindowRect().x;
   config_.window_y = engine().GetWindow()->GetWindowRect().y;
-  config_.window_width = engine().GetWindow()->GetClientRect().width;
-  config_.window_height = engine().GetWindow()->GetClientRect().height;
+  config_.window_width = engine().GetWindow()->GetWindowRect().width;
+  config_.window_height = engine().GetWindow()->GetWindowRect().height;
   config_.window_state = engine().GetWindow()->GetState();
   config_.mru.clear();
   for (const std::string& v : m.mru) {
