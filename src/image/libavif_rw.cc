@@ -127,20 +127,38 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
       throw std::runtime_error("failed to avifDecoderParse().");
     }
 
+
+    if (decoder->image->depth == 8) {
+
+    } else if (decoder->image->depth > 8) {
+
+    }
+
     avifRGBImage rgb{};
     avifRGBImageSetDefaults(&rgb, decoder->image);
-    rgb.chromaUpsampling = AVIF_CHROMA_UPSAMPLING_NEAREST;  // TODO:
-    rgb.depth = 8;                                          // TODO:
+    rgb.chromaUpsampling = AVIF_CHROMA_UPSAMPLING_AUTOMATIC;
+    rgb.depth = decoder->image->depth > 8 ? 16 : 8;
     rgb.format = AVIF_RGB_FORMAT_RGBA;
+
+    PixelFormatType pixel_format = PixelFormatType::rgba8;
+    ColorSpaceType color_space = ColorSpaceType::sRGB;
+    size_t stride = decoder->image->width * 4;
+    size_t size = decoder->image->width * 4 * decoder->image->height;
+    if (rgb.depth == 16) {
+      rgb.isFloat = true;
+      pixel_format = PixelFormatType::rgba16f;
+      color_space = ColorSpaceType::Linear;
+      stride = decoder->image->width * 8;
+      size = decoder->image->width * 8 * decoder->image->height;
+    }
 
     std::unique_ptr<Image> image(new Image{
         .width = (int)decoder->image->width,
         .height = (int)decoder->image->height,
-        .stride = decoder->image->width * 4,
-        .buffer = ImageBuffer::Alloc(
-            decoder->image->width * 4 * decoder->image->height),
-        .pixel_format = PixelFormatType::rgba8,
-        .color_space = ColorSpaceType::sRGB,
+        .stride = stride,
+        .buffer = ImageBuffer::Alloc(size),
+        .pixel_format = pixel_format,
+        .color_space = color_space,
         .decoder = DecoderType::libavif,
         .metadata =
             {
@@ -169,7 +187,7 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
             },
     });
     rgb.pixels = image->buffer->data;
-    rgb.rowBytes = decoder->image->width * 4;
+    rgb.rowBytes = (uint32_t)stride;
 
     result = avifImageYUVToRGB(decoder->image, &rgb);
     if (result != AVIF_RESULT_OK) {

@@ -9,12 +9,13 @@
 
 namespace rad {
 
-inline std::pair<int, int> getBytesPerPixel(PixelFormatType format) noexcept {
+std::pair<int, int> getBytesPerPixel(PixelFormatType format) noexcept {
   switch (format) {
     case PixelFormatType::rgba8:
     case PixelFormatType::bgra8:
       return {4, 1};
     case PixelFormatType::rgba16:
+    case PixelFormatType::rgba16f:
       return {8, 1};
     case PixelFormatType::rgba32f:
       return {16, 1};
@@ -24,110 +25,15 @@ inline std::pair<int, int> getBytesPerPixel(PixelFormatType format) noexcept {
   }
 }
 
-struct uchar4 {
-  uchar4() = default;
-  uchar4(uint8_t x, uint8_t y, uint8_t z, uint8_t w) : x(x), y(y), z(z), w(w) {}
-  uint8_t x, y, z, w;
-  template <typename T>
-  uchar4 operator+(T v) {
-    return {x + v, y + v, z * v, w * v};
-  }
-  template <typename T>
-  uchar4 operator-(T v) {
-    return {x - v, y - v, z - v, w - v};
-  }
-  template <typename T>
-  uchar4 operator*(T v) {
-    return {x * v, y * v, z * v, w * v};
-  }
-  template <typename T>
-  uchar4 operator/(T v) {
-    return {x / v, y / v, z / v, w / v};
-  }
-};
-
-struct ushort4 {
-  ushort4() = default;
-  ushort4(uint16_t x, uint16_t y, uint16_t z, uint16_t w) : x(x), y(y), z(z), w(w) {}
-  uint16_t x, y, z, w;
-  template <typename T>
-  ushort4 operator+(T v) {
-    return {x + v, y + v, z * v, w * v};
-  }
-  template <typename T>
-  ushort4 operator-(T v) {
-    return {x - v, y - v, z - v, w - v};
-  }
-  template <typename T>
-  ushort4 operator*(T v) {
-    return {x * v, y * v, z * v, w * v};
-  }
-  template <typename T>
-  ushort4 operator/(T v) {
-    return {x / v, y / v, z / v, w / v};
-  }
-};
-
-struct float4 {
-  float4() = default;
-  float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
-  float x, y, z, w;
-  template <typename T>
-  float operator+(T v) {
-    return {x + v, y + v, z * v, w * v};
-  }
-  template <typename T>
-  float operator-(T v) {
-    return {x - v, y - v, z - v, w - v};
-  }
-  template <typename T>
-  float operator*(T v) {
-    return {x * v, y * v, z * v, w * v};
-  }
-  template <typename T>
-  float operator/(T v) {
-    return {x / v, y / v, z / v, w / v};
-  }
-};
-
-template <typename T>
-inline void resizeNN(const T* src, T* dst, int sw, int sh, int dw, int dh) {
+void resizeNearest(const void* src, void* dst, size_t channels,
+    size_t channel_size, int sw, int sh, int dw, int dh) {
   for (int y = 0; y < dh; ++y) {
+    int sy = (int)((float)y / dh * sh);
     for (int x = 0; x < dw; ++x) {
-      int sy = (int)((float)y / dh * sh);
       int sx = (int)((float)x / dw * sw);
-      dst[y * dw + x] = src[sy * sw + sx];
-    }
-  }
-}
-
-template <typename T>
-inline void resizeBilinear(
-    const T* src, T* dst, int sw, int sh, int dw, int dh) {
-  for (int y = 0; y < dh; ++y) {
-    for (int x = 0; x < dw; ++x) {
-      float fy = (float)y / dh * sh;
-      float fx = (float)x / dw * sw;
-      int gy = (int)fy;
-      int gx = (int)fx;
-
-      const auto p = [src, sw, sh](int x, int y) {
-        x = std::min(sw - 1, x);
-        y = std::min(sh - 1, y);
-        return src[y * sw + x];
-      };
-
-      T c00 = p(gx, gy);
-      T c10 = p(gx + 1, gy);
-      T c01 = p(gx, gy + 1);
-      T c11 = p(gx + 1, gy + 1);
-
-      const auto lerp = [](const T& s, const T& e, float t) {
-        return s + (e - s) * t;
-      };
-      T ret = lerp(lerp(c00, c10, gx), lerp(c01, c11, gx), gy);
-
-      dst[y * dw + x] = ret;
+      size_t src_idx = sy * sw * channel_size * channels + sx * channel_size * channels;
+      size_t dst_idx = y * dw * channel_size * channels + x * channel_size * channels;
+      ::memcpy((uint8_t*)dst + dst_idx, (uint8_t*)src + src_idx, channels * channel_size);
     }
   }
 }
@@ -172,25 +78,28 @@ std::unique_ptr<Image> Image::Resize(
   dst->height = dst_height;
   dst->stride = stride;
 
+  size_t channels = 4;
+  size_t channel_size;
   switch (pixel_format) {
     case PixelFormatType::rgba8:
     case PixelFormatType::bgra8:
-      resizeNN<uchar4>((uchar4*)buffer->data, (uchar4*)dst->buffer->data, width,
-          height, dst_width, dst_height);
+      channel_size = 1;
       break;
     case PixelFormatType::rgba16:
-      resizeNN<ushort4>((ushort4*)buffer->data, (ushort4*)dst->buffer->data,
-          width, height, dst_width, dst_height);
+      channel_size = 2;
+      break;
+    case PixelFormatType::rgba16f:
+      channel_size = 2;
       break;
     case PixelFormatType::rgba32f:
-      resizeNN<float4>((float4*)buffer->data, (float4*)dst->buffer->data, width,
-          height, dst_width, dst_height);
+      channel_size = 4;
       break;
     default:
       assert(false && "not implemented.");
       break;
   }
 
+  resizeNearest(buffer->data, dst->buffer->data, channels, channel_size, width, height, dst_width, dst_height);
   return dst;
 }
 

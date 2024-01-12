@@ -25,6 +25,44 @@ entt::registry& world() { return engine().world_; }
 
 namespace rad {
 
+namespace {
+
+DXGI_FORMAT GetDXGIFormat(PixelFormatType type) {
+  switch (type) {
+    case PixelFormatType::rgba8:
+      return DXGI_FORMAT_R8G8B8A8_UNORM;
+    case PixelFormatType::bgra8:
+      return DXGI_FORMAT_B8G8R8A8_UNORM;
+    case PixelFormatType::rgba16:
+      return DXGI_FORMAT_R16G16B16A16_UNORM;
+    case PixelFormatType::rgba16f:
+      return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case PixelFormatType::rgba32f:
+      return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    default:
+      assert(false && "not implemented.");
+      return DXGI_FORMAT_UNKNOWN;
+  }
+}
+
+int GetBytesPerPixel(PixelFormatType type) {
+  switch (type) {
+    case PixelFormatType::rgba8:
+    case PixelFormatType::bgra8:
+      return 4;
+    case PixelFormatType::rgba16:
+    case PixelFormatType::rgba16f:
+      return 8;
+    case PixelFormatType::rgba32f:
+      return 16;
+    default:
+      assert(false && "not implemented.");
+      return 0;
+  }
+}
+
+}  // namespace
+
 Mesh::Mesh(std::shared_ptr<gfx::Resource> vertex_buffer, int vertex_count,
     int vertex_start, std::shared_ptr<gfx::Resource> index_buffer,
     int index_start)
@@ -104,21 +142,8 @@ nlohmann::json Engine::GetStats() const {
 std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
   assert(image);
 
-  DXGI_FORMAT dxgi_format;
-  int bpp = 0;
-  if (image->pixel_format == PixelFormatType::bgra8) {
-    dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    bpp = 4;
-  } else if (image->pixel_format == PixelFormatType::rgba16) {
-    dxgi_format = DXGI_FORMAT_R16G16B16A16_UNORM;
-    bpp = 8;
-  } else if (image->pixel_format == PixelFormatType::rgba32f) {
-    dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    bpp = 16;
-  } else if (image->pixel_format == PixelFormatType::rgba8) {
-    dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    bpp = 4;
-  }
+  DXGI_FORMAT dxgi_format = GetDXGIFormat(image->pixel_format);
+  int bpp = GetBytesPerPixel(image->pixel_format);
 
   if (tiled) {
     int tile = kTileSize;
@@ -149,27 +174,8 @@ std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
         assert(src_remain_width > 0 && src_remain_height > 0);
         assert(copy_width > 0 && copy_height > 0);
 
-        DXGI_FORMAT dxgi_format;
-        int bpp = 0;
-        if (image->pixel_format == PixelFormatType::bgra8) {
-          dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
-          bpp = 4;
-        } else if (image->pixel_format == PixelFormatType::rgba16) {
-          dxgi_format = DXGI_FORMAT_R16G16B16A16_UNORM;
-          bpp = 8;
-        } else if (image->pixel_format == PixelFormatType::rgba32f) {
-          dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-          bpp = 16;
-        } else if (image->pixel_format == PixelFormatType::rgba8) {
-          dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM;
-          bpp = 4;
-        } else {
-          throw std::runtime_error("unsupported format.");
-          return nullptr;
-        }
         int width_in_bytes = image->width * bpp;
-        size_t src_offset =
-            (src_offset_y * image->stride) + (src_offset_x * bpp);
+        size_t src_offset = (src_offset_y * image->stride) + (src_offset_x * bpp);
 
         gfx::Device::UploadDesc desc{};
         desc.dst_subresource_index = y * cols + x;

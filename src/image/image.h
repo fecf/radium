@@ -23,14 +23,13 @@ enum class DecoderType {
 
 enum class FormatType {
   unknown,
-  bmp,
-  jpg,
 };
 
-enum class PixelFormatType : int {
+enum class PixelFormatType {
   unknown,
   rgba8,
   rgba16,
+  rgba16f,
   rgba32f,
   bgra8,
 };
