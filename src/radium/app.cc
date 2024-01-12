@@ -139,10 +139,18 @@ void App::Start(int argc, char** argv) {
   saveSettings();
 
   // release all resources
-  imgui_font_atlas_.reset();
-  ServiceLocator::Clear();
+  pool_content.Wait();
+  pool_thumbnail.Wait();
   m.contents.clear();
   m.thumbnails.clear();
+  processDeferredTasks();
+  imgui_font_atlas_.reset();
+  ServiceLocator::Clear();
+
+  assert(pool_content.remainings() == 0);
+  assert(pool_thumbnail.remainings() == 0);
+  assert(deferred_tasks_.empty());
+
   engine().Destroy();
 }
 

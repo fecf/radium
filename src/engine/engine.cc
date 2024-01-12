@@ -87,6 +87,7 @@ bool Engine::Initialize(const WindowConfig& base_window_config) {
 }
 
 void Engine::Destroy() {
+  world().clear();
   window_.reset();
   device_.reset();
 }

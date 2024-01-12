@@ -629,7 +629,6 @@ void Device::CreateDeviceResources() {
 #ifdef _DEBUG
   debug_layer_->Initialize(d3d_.Get());
 #endif
-  destructor_ = std::unique_ptr<ResourceDestructor>(new ResourceDestructor());
 
   rtv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 0, 16, false));
   dsv_staging_heap_ = std::unique_ptr<DescriptorHeap>(new DescriptorHeap(d3d_, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, 1, false));
@@ -1014,6 +1013,9 @@ void Device::DestroyResources() {
   srv_heap_ = {};
 
   destructor_.reset();
+  for (const auto& kv : resource_map_) {
+    assert(kv.second.expired());
+  }
   allocator_.Reset();
 
   rtv_staging_heap_.reset();
