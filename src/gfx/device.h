@@ -17,8 +17,6 @@ using namespace Microsoft::WRL;
 #include <linalg.h>
 using namespace linalg::aliases;
 
-#include "base/thread.h"
-
 namespace D3D12MA {
 class Allocator;
 class Allocation;
@@ -180,7 +178,7 @@ class CommandQueue {
   std::mutex mutex_fence_;
   std::mutex mutex_event_;
   std::mutex mutex_inflight_;
-  std::map<uint64_t, std::vector<std::shared_ptr<CommandSubmission>>> inflight_;
+  std::unordered_map<uint64_t, std::vector<std::shared_ptr<CommandSubmission>>> inflight_;
 };
 
 struct DrawCall {
@@ -213,7 +211,7 @@ class ResourceDestructor {
 
  private:
   mutable std::mutex mutex_;
-  std::map<uint64_t, std::vector<Resource*>> resources_;
+  std::unordered_map<uint64_t, std::vector<Resource*>> resources_;
 };
 
 class Swapchain {
@@ -285,8 +283,8 @@ class Device {
   std::shared_ptr<Resource> CreateRenderTarget(
       int width, int height, DXGI_FORMAT format);
 
-  nlohmann::json make_rhi_stats() const;
-  nlohmann::json make_device_stats() const;
+  nlohmann::json GetDeviceStats() const;
+  nlohmann::json GetSwapchainStats() const;
 
   struct UploadDesc {
     const uint8_t* src;
@@ -358,7 +356,7 @@ class Device {
 
   // resource management
   mutable std::mutex mutex_resource_map_;
-  std::map<uint64_t, std::weak_ptr<Resource>> resource_map_;
+  std::unordered_map<uint64_t, std::weak_ptr<Resource>> resource_map_;
   std::unique_ptr<ResourceDestructor> destructor_;
   std::atomic<uint64_t> resource_id_;
 };

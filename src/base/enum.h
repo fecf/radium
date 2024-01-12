@@ -145,7 +145,7 @@ constexpr std::string_view enum_to_string(E value) {
   for (const auto& [key, name] : entries_v<E>) {
     if (value == key) return name;
   }
-  return {};
+  return "";
 }
 
 }  // namespace magic_enum

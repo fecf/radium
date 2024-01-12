@@ -25,7 +25,7 @@ std::unique_ptr<Image> LibJpegTurboRW::Decode(const uint8_t* data, size_t size) 
       .stride = (size_t)width * 4,
       .buffer = ImageBuffer::Alloc(width * height * 4),
       .pixel_format = PixelFormatType::rgba8,
-      .color_space = ColorSpaceType::srgb,
+      .color_space = ColorSpaceType::sRGB,
       .decoder = DecoderType::libjpegturbo,
   });
 

@@ -33,18 +33,18 @@ std::unique_ptr<Image> StbRW::Decode(const uint8_t* data, size_t size) {
     decoded_data = (uint8_t*)stbi_loadf_from_memory(data, (int)size, &x, &y, &comp, 4);
     stride = x * 4 * 4;
     pixel_format = PixelFormatType::rgba32f;
-    color_space = ColorSpaceType::linear;
+    color_space = ColorSpaceType::Linear;
   } else {
     if (is_16bit) {
       decoded_data = (uint8_t*)stbi_load_16_from_memory(data, (int)size, &x, &y, &comp, 4);
       stride = x * 4 * 2;
       pixel_format = PixelFormatType::rgba16;
-      color_space = ColorSpaceType::srgb;
+      color_space = ColorSpaceType::sRGB;
     } else {
       decoded_data = (uint8_t*)stbi_load_from_memory(data, (int)size, &x, &y, &comp, 4);
       stride = x * 4;
       pixel_format = PixelFormatType::rgba8;
-      color_space = ColorSpaceType::srgb;
+      color_space = ColorSpaceType::sRGB;
     }
   }
 

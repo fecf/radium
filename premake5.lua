@@ -33,6 +33,7 @@ project (name)
         "src/third_party/wil/include",
         "src/third_party/wuffs",
         "src/third_party/entt",
+        "src/third_party/magic_enum",
         "build/generated",
         "vcpkg_installed/x64-windows-static/include",
     }

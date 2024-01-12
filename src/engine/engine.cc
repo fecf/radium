@@ -25,6 +25,15 @@ entt::registry& world() { return engine().world_; }
 
 namespace rad {
 
+Mesh::Mesh(std::shared_ptr<gfx::Resource> vertex_buffer, int vertex_count,
+    int vertex_start, std::shared_ptr<gfx::Resource> index_buffer,
+    int index_start)
+    : vertex_buffer(vertex_buffer),
+      vertex_count(vertex_count),
+      vertex_start(vertex_start),
+      index_buffer(index_buffer),
+      index_start(index_start) {}
+
 Texture::Texture(std::shared_ptr<gfx::Resource> resource, int width, int height,
     ColorSpace color_space, int array_size, int array_src_width,
     int array_src_height)
@@ -78,12 +87,18 @@ bool Engine::Initialize(const WindowConfig& base_window_config) {
 }
 
 void Engine::Destroy() {
-  imgui_font_atlas_.reset();
   window_.reset();
   device_.reset();
 }
 
 Window* Engine::GetWindow() const { return window_.get(); }
+
+nlohmann::json Engine::GetStats() const { 
+  nlohmann::json json;
+  json["device"] = device_->GetDeviceStats(); 
+  json["swapchain"] = device_->GetSwapchainStats(); 
+  return json;
+}
 
 std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
   assert(image);
@@ -295,7 +310,7 @@ void Engine::Draw() {
         Constants constants{};
         constants.alpha = re.alpha;
         constants.filter = ::Filter::Bilinear;
-        constants.cs_src = ::ColorSpace::sRGB;
+        constants.cs_src = re.texture->color_space;
         constants.cs_dst = ::ColorSpace::Linear;
         dc.constant_buffer.resize(sizeof(constants));
         memcpy(dc.constant_buffer.data(), &constants, sizeof(constants));

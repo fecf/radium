@@ -41,7 +41,7 @@ std::unique_ptr<Image> WuffsRW::Decode(const uint8_t* data, size_t size) {
       .buffer = ImageBuffer::From(
           ptr, width * height * 4, [](void* ptr) { delete ptr; }),
       .pixel_format = PixelFormatType::bgra8,
-      .color_space = ColorSpaceType::srgb,
+      .color_space = ColorSpaceType::sRGB,
       .decoder = DecoderType::wuffs,
   });
   res.pixbuf_mem_owner.release();

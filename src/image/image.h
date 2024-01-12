@@ -27,18 +27,18 @@ enum class FormatType {
   jpg,
 };
 
-enum class PixelFormatType {
+enum class PixelFormatType : int {
   unknown,
-  rgba8 = 0,
+  rgba8,
   rgba16,
   rgba32f,
   bgra8,
 };
 
 enum class ColorSpaceType {
-  unknown,
-  srgb,
-  linear,
+  Unknown,
+  sRGB,
+  Linear,
 };
 
 enum class InterpolationType {
@@ -99,7 +99,7 @@ class Image {
   std::shared_ptr<ImageBuffer> buffer;
   FormatType format = FormatType::unknown;
   PixelFormatType pixel_format = PixelFormatType::unknown;
-  ColorSpaceType color_space = ColorSpaceType::unknown;
+  ColorSpaceType color_space = ColorSpaceType::Unknown;
   DecoderType decoder = DecoderType::unknown;
   std::vector<std::pair<std::string, std::string>> metadata;
 };

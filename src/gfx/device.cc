@@ -558,6 +558,7 @@ void Swapchain::UpdateStats() {
         return "unknown";
     }
   };
+
   stats_["advanced_color_info"] = nlohmann::json{
       {"supported", get_advanced_color_info.advancedColorSupported > 0},
       {"enabled", get_advanced_color_info.advancedColorEnabled > 0},
@@ -1422,8 +1423,8 @@ void Device::renderImGuiResetContext(ComPtr<ID3D12GraphicsCommandList> ctx, ImDr
   ctx->OMSetBlendFactor(blend_factor);
 }
 
-nlohmann::json Device::make_rhi_stats() const {
-  D3D12MA::TotalStatistics allocator_stats;
+nlohmann::json Device::GetDeviceStats() const {
+  D3D12MA::TotalStatistics allocator_stats{};
   allocator_->CalculateStatistics(&allocator_stats);
 
   uint64_t live_count = 0;
@@ -1436,21 +1437,19 @@ nlohmann::json Device::make_rhi_stats() const {
     } 
   }
 
-  nlohmann::json json = {
+  return nlohmann::json{
       {"frame_count", frame_},
       {"draw_call_count", main_drawcalls_.size()},
       {"live_count", live_count},
       {"pending_delete_count", destructor_->count()},
       {"alloc_bytes", allocator_stats.Total.Stats.BlockBytes -
-                               allocator_stats.Total.Stats.AllocationBytes},
+                          allocator_stats.Total.Stats.AllocationBytes},
       {"alloc_unused_bytes", allocator_stats.Total.Stats.AllocationBytes},
   };
-  return json;
 }
 
-nlohmann::json Device::make_device_stats() const {
-  nlohmann::json json = swapchain_->GetStats();
-  return json;
+nlohmann::json Device::GetSwapchainStats() const {
+  return swapchain_->GetStats();
 }
 
 std::shared_ptr<Resource> Device::CreateBuffer(size_t size) {

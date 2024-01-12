@@ -140,7 +140,7 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
         .buffer = ImageBuffer::Alloc(
             decoder->image->width * 4 * decoder->image->height),
         .pixel_format = PixelFormatType::rgba8,
-        .color_space = ColorSpaceType::srgb,
+        .color_space = ColorSpaceType::sRGB,
         .decoder = DecoderType::libavif,
         .metadata =
             {
@@ -148,8 +148,8 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
                 {"yuvFormat", avifPixelFormatToString(decoder->image->yuvFormat)},
                 {"yuvRange", getRangeName(decoder->image->yuvRange)},
                 {"yuvChromaSamplePosition", getChromaSamplePositionName(decoder->image->yuvChromaSamplePosition)},
-                {"ownsAlphaPlane", decoder->image->imageOwnsAlphaPlane ? "true" : "false"},
-                {"alphaPremultiplied", decoder->image->alphaPremultiplied ? "true" : "false"},
+                {"ownsAlphaPlane", decoder->image->imageOwnsAlphaPlane ? "True" : "False"},
+                {"alphaPremultiplied", decoder->image->alphaPremultiplied ? "True" : "False"},
                 {"colorPrimaries",
                     std::format("{}({})",
                         getColorPrimariesName(decoder->image->colorPrimaries),

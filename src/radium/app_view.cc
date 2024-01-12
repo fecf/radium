@@ -146,6 +146,7 @@ void View::renderImGui() {
     }
 
     if (ImGui::BeginPopup("##popup")) {
+      ImGui::PushFont(a.GetFont(App::Small));
       if (ImGui::MenuItem("Open File ...")) {
         ImGui::CloseCurrentPopup();
         openDialog();
@@ -170,6 +171,7 @@ void View::renderImGui() {
       if (ImGui::MenuItem("Open in explorer ...")) {
         i.Dispatch(Intent::OpenInExplorer{m.present_content_path});
       }
+      ImGui::PopFont();
       ImGui::EndPopup();
     }
     if (ImGui::IsWindowFocused() &&
@@ -184,7 +186,7 @@ void View::renderImGui() {
           float radius = 16.0f;
           ImGui::SetCursorPos(
               (ImGui::GetContentRegionAvail() / 2.0f) - ImVec2(radius, radius));
-          Spinner(radius, 4.0f, 32, 1.0f, 0xcc909090);
+          Spinner(radius, 4.0f, 32, 1.0f, 0xffc0c0c0);
         } else if (!content->texture) {
           // failed
           ImGui::PushFont(a.GetFont(App::Large));
@@ -333,84 +335,6 @@ void View::renderImGui() {
 
   // overlay
   renderImGuiOverlay();
-
-  // debug
-#ifdef _DEBUG
-  static bool debug = true;
-  if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-    debug = !debug;
-  }
-#else
-  static bool debug = false;
-#endif
-  if (debug) {
-    ImGui::SetNextWindowPos({16, 16});
-    ImGui::SetNextWindowSize({800, 800});
-    if (ImGui::Begin("debug", 0,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
-                ImGuiWindowFlags_NoFocusOnAppearing)) {
-      if (ImGui::BeginTable("##table", 2, ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Framerate");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().Framerate);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Delta");
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", ImGui::GetIO().DeltaTime);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Current Path");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.content_path.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Current Directory");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.cwd.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Present Path");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", m.present_content_path.c_str());
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Content Layout");
-        ImGui::TableNextColumn();
-        ImGui::Text("cx=%.02f cy=%.02f rotate=%.02f scale=%.02f", m.content_cx,
-            m.content_cy, m.content_rotate, m.content_zoom);
-        ImGui::TableNextColumn();
-
-        ImGui::Text("Stored Contents");
-        ImGui::TableNextColumn();
-        for (const auto sp : m.contents) {
-          ImGui::Text("%s", sp->path.c_str());
-          if (sp->texture) {
-            ImGui::SameLine();
-            ImGui::Text("%s", "[Loaded]");
-          }
-        }
-        ImGui::TableNextColumn();
-
-        // ImGui::Text("Stored Thumbnails");
-        // ImGui::TableNextColumn();
-
-        // for (const auto& [path, sp] : m.thumbnails) {
-        //   ImGui::Text("%s", path.c_str());
-        //   if (sp->texture) {
-        //     ImGui::SameLine();
-        //     ImGui::Text("%s", "[Loaded]");
-        //   }
-        // }
-
-        ImGui::TableNextColumn();
-        ImGui::EndTable();
-      }
-      ImGui::End();
-    }
-  }
 }
 
 void View::renderContent() {

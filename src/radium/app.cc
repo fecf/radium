@@ -283,7 +283,7 @@ void App::uploadImGuiFonts() {
       .buffer = rad::ImageBuffer::From(
           pixels, width * bpp * height, [](void* ptr) { delete ptr; }),
       .pixel_format = rad::PixelFormatType::rgba8,
-      .color_space = rad::ColorSpaceType::srgb,
+      .color_space = rad::ColorSpaceType::sRGB,
   });
   imgui_font_atlas_ = engine().CreateTexture(image.get());
   ImTextureID texture_id = reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());

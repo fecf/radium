@@ -70,7 +70,7 @@ std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
     CHECK(pixel_format_info->GetBitsPerPixel(&bpp));
 
     PixelFormatType format = PixelFormatType::rgba8;
-    ColorSpaceType cs = ColorSpaceType::srgb;
+    ColorSpaceType cs = ColorSpaceType::sRGB;
 
     ComPtr<IWICFormatConverter> converter;
     CHECK(factory->CreateFormatConverter(&converter));
@@ -79,7 +79,7 @@ std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
           GUID_WICPixelFormat128bppRGBAFloat, WICBitmapDitherTypeNone, nullptr,
           0.0f, WICBitmapPaletteTypeCustom));
       format = PixelFormatType::rgba32f;
-      cs = ColorSpaceType::linear;
+      cs = ColorSpaceType::Linear;
     } else {
       CHECK(converter->Initialize(bitmap_frame.Get(),
           GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0f,

@@ -30,17 +30,11 @@ constexpr int kTileSize = 2048;
 struct Mesh {
   Mesh(std::shared_ptr<gfx::Resource> vertex_buffer, int vertex_count,
       int vertex_start = 0, std::shared_ptr<gfx::Resource> index_buffer = {},
-      int index_start = 0)
-      : vertex_buffer(vertex_buffer),
-        vertex_count(vertex_count),
-        vertex_start(vertex_start),
-        index_buffer(index_buffer),
-        index_start(index_start) {}
+      int index_start = 0);
 
   std::shared_ptr<gfx::Resource> vertex_buffer;
   int vertex_count;
   int vertex_start;
-
   std::shared_ptr<gfx::Resource> index_buffer;
   int index_start;
 };
@@ -92,7 +86,9 @@ class Engine {
   void Draw();
   bool BeginFrame();
   void EndFrame();
+  
   Window* GetWindow() const;
+  nlohmann::json GetStats() const;
 
   std::unique_ptr<Texture> CreateTexture(const Image* image, bool tiled = false);
   std::unique_ptr<Mesh> CreateMesh();
@@ -100,9 +96,8 @@ class Engine {
  private:
   std::unique_ptr<gfx::Device> device_;
   std::unique_ptr<Window> window_;
-  std::unique_ptr<Texture> imgui_font_atlas_;
-  bool rendering_;
   entt::registry world_;
+  bool rendering_;
 };
 
 }  // namespace rad
