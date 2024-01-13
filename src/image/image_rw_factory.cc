@@ -33,10 +33,10 @@ std::unique_ptr<ImageDecoderBase> ImageRWFactory::Create(const std::string& path
   if (extension == ".psd" || extension == ".hdr" || extension == ".pic") {
     return std::make_unique<StbRW>();
   }
-  if (extension == ".tif" || extension == ".tiff" || extension == ".ico" ||
-      extension == ".jxr") {
-    return std::make_unique<WicRW>();
-  }
+  // if (extension == ".tif" || extension == ".tiff" || extension == ".ico" ||
+  //     extension == ".jxr") {
+  //   return std::make_unique<WicRW>();
+  // }
 
   return nullptr;
 }

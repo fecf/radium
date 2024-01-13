@@ -71,6 +71,7 @@ std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
 
     PixelFormatType format = PixelFormatType::rgba8;
     ColorSpaceType cs = ColorSpaceType::sRGB;
+    size_t bytes_per_pixel = 4;
 
     ComPtr<IWICFormatConverter> converter;
     CHECK(factory->CreateFormatConverter(&converter));
@@ -80,6 +81,7 @@ std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
           0.0f, WICBitmapPaletteTypeCustom));
       format = PixelFormatType::rgba32f;
       cs = ColorSpaceType::Linear;
+      bytes_per_pixel = 16;
     } else {
       CHECK(converter->Initialize(bitmap_frame.Get(),
           GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0f,
@@ -108,8 +110,8 @@ std::unique_ptr<Image> WicRW::Decode(const uint8_t* data, size_t size) {
     std::unique_ptr<Image> image(new Image{
         .width = (int)w,
         .height = (int)h,
-        .stride = (size_t)w * 4,
-        .buffer = ImageBuffer::From(buf, w * h * 4, [](void* ptr) { delete[] ptr; }),
+        .stride = (size_t)w * bytes_per_pixel,
+        .buffer = ImageBuffer::From(buf, w * h * bytes_per_pixel, [](void* ptr) { delete[] ptr; }),
         .pixel_format = format,
         .color_space = cs,
         .decoder = DecoderType::wic,
