@@ -139,11 +139,17 @@ void Intent::Dispatch(Action action) {
 }
 
 void Intent::openImpl(const std::string& path) {
-  // set content path
+  if (path.empty()) {
+    return;
+  }
+
   std::string fullpath = rad::GetFullPath(path);
   if (fullpath.empty()) {
     fullpath = path;
   }
+  std::filesystem::path fspath(rad::to_wstring(fullpath));
+
+  // set content path
   m.content_path = fullpath;
   m.PushMRU(fullpath);
 
@@ -152,9 +158,8 @@ void Intent::openImpl(const std::string& path) {
   engine().GetWindow()->SetTitle(title.c_str());
 
   // change cwd
-  std::filesystem::path fspath(rad::to_wstring(fullpath));
-  std::error_code ec;
   bool changed = false;
+  std::error_code ec;
   bool is_dir = std::filesystem::is_directory(fspath, ec);
   if (!ec) {
     if (!is_dir) fspath = fspath.parent_path();
@@ -194,7 +199,7 @@ void Intent::openImpl(const std::string& path) {
   PrefetchContent(fullpath);
   std::string prev, next;
   auto it = std::find_if(m.cwd_entries.begin(), m.cwd_entries.end(),
-      [&](const std::string& p) { return p == m.content_path; });
+      [&](const std::string& p) { return p == fullpath; });
   if (it != m.cwd_entries.end()) {
     auto itp = (it == m.cwd_entries.begin()) ? std::prev(m.cwd_entries.end())
                                              : std::prev(it);

@@ -96,6 +96,7 @@ std::string ConvertToCanonicalPath(const std::string& path, std::error_code& ec)
 }
 
 std::string GetFullPath(const std::string& path) noexcept {
+  /*
   HANDLE handle = ::CreateFileW(to_wstring(path).c_str(), GENERIC_READ,
       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
       OPEN_EXISTING, FILE_ATTRIBUTE_READONLY | FILE_FLAG_NO_BUFFERING, NULL);
@@ -115,6 +116,11 @@ std::string GetFullPath(const std::string& path) noexcept {
     }
   }
   return "";
+  */
+
+  std::vector<wchar_t> buf(32768);
+  DWORD size = ::GetFullPathNameW(to_wstring(path).c_str(), buf.size(), buf.data(), NULL);
+  return to_string(buf.data());
 }
 
 MemoryMappedFile::MemoryMappedFile(const std::string& path) {
