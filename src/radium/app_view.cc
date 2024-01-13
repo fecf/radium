@@ -30,7 +30,7 @@ void View::renderImGui() {
   ImVec4 kAccentDark = ImVec4(0.15f, 0.4f, 0.2f, 1.0f);
   ImVec4 kHeader = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);
   ImVec4 kHeaderHovered = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
-  ImVec4 kPopup = ImVec4(0.0f, 0.0f, 0.0f, 0.75f);
+  ImVec4 kPopup = ImVec4(0.0f, 0.0f, 0.0f, 0.90f);
   style.Colors[ImGuiCol_Text] = kText;
   style.Colors[ImGuiCol_ChildBg] = ImVec4();
   style.Colors[ImGuiCol_WindowBg] = ImVec4();
