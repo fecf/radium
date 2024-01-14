@@ -57,7 +57,14 @@ void Intent::Dispatch(Action action) {
       [&](const OpenInExplorer& e) { 
         rad::platform::OpenFolder(e.path);
       },
-      [&](const Refresh& e) { openImpl(m.content_path); },
+      [&](const Refresh& e) { 
+        auto it = std::remove_if(m.contents.begin(), m.contents.end(),
+            [&](std::shared_ptr<Model::Content> sp) {
+              return sp->path == m.content_path;
+            });
+        m.contents.erase(it, m.contents.end());
+        openImpl(m.content_path); 
+      },
       [&](const Fit& e) {
         if (auto content = m.GetPresentContent()) {
           if (content->image) {
