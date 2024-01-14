@@ -12,13 +12,14 @@
 namespace rad {
 
 enum class DecoderType {
-  unknown,
+  Unknown,
   libavif,
   libjpegturbo,
   stb,
   pnm,
   wic,
   wuffs,
+  lodepng,
 };
 
 enum class FormatType {
@@ -38,6 +39,7 @@ enum class ColorSpaceType {
   Unknown,
   sRGB,
   Linear,
+  Rec2100PQ,
 };
 
 enum class InterpolationType {
@@ -99,7 +101,7 @@ class Image {
   FormatType format = FormatType::unknown;
   PixelFormatType pixel_format = PixelFormatType::unknown;
   ColorSpaceType color_space = ColorSpaceType::Unknown;
-  DecoderType decoder = DecoderType::unknown;
+  DecoderType decoder = DecoderType::Unknown;
   std::vector<std::pair<std::string, std::string>> metadata;
 };
 

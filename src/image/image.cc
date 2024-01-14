@@ -60,8 +60,12 @@ std::unique_ptr<Image> Image::Load(const std::string& path) {
     return nullptr;
   }
 
-  MemoryMappedFile mmap(path);
-  return rw->Decode((const uint8_t*)mmap.data(), mmap.size());
+  auto ret = rw->Decode(path);
+  if (!ret) {
+    MemoryMappedFile mmap(path);
+    ret = rw->Decode((const uint8_t*)mmap.data(), mmap.size());
+  }
+  return ret;
 }
 
 Image::~Image() {}
@@ -104,11 +108,11 @@ std::unique_ptr<Image> Image::Resize(
 }
 
 std::unique_ptr<Image> ImageDecoderBase::Decode(const std::string& path) {
-  throw std::domain_error("not implemented.");
+  return {};
 }
 
 std::unique_ptr<Image> ImageDecoderBase::Decode(const uint8_t* data, size_t size) {
-  throw std::domain_error("not implemented.");
+  return {};
 }
 
 }  // namespace rad

@@ -4,6 +4,7 @@
 
 #include "libavif_rw.h"
 #include "libjpegturbo_rw.h"
+#include "lodepng_rw.h"
 #include "pnm_rw.h"
 #include "stb_rw.h"
 #include "wic_rw.h"
@@ -23,8 +24,11 @@ std::unique_ptr<ImageDecoderBase> ImageRWFactory::Create(const std::string& path
   std::transform(extension.begin(), extension.end(), extension.begin(),
       [](unsigned char c) { return std::tolower(c); });
 
+  if (extension == ".png") {
+    return std::make_unique<LodePngRW>();
+  }
   if (extension == ".bmp" || extension == ".gif" || extension == ".jpeg" ||
-      extension == ".jpg" || extension == ".png" || extension == ".tga") {
+      extension == ".jpg" || extension == ".tga") {
     return std::make_unique<WuffsRW>();
   }
   if (extension == ".avif") {

@@ -6,8 +6,10 @@ enum class Filter : int {
 };
 
 enum class ColorSpace : int {
-  sRGB = 0,
+  Unknown = 0,
+  sRGB,
   Linear,
+  Rec2020PQ,
 };
 
 enum class ToneMapping : int {

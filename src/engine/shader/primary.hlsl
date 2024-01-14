@@ -195,6 +195,20 @@ float3 linear_to_srgb(float3 color)
     return select(color < 0.0031308, 12.92 * color, 1.055 * pow(abs(color), 1.0 / 2.4) - 0.055);
 }
 
+float3 pq_eotf(float3 color)
+{
+    const float c1 = 0.8359375; // 3424.f/4096.f;
+    const float c2 = 18.8515625; // 2413.f/4096.f*32.f;
+    const float c3 = 18.6875; // 2392.f/4096.f*32.f;
+    const float m1 = 0.159301758125; // 2610.f / 4096.f / 4;
+    const float m2 = 78.84375; // 2523.f / 4096.f * 128.f;
+    float3 M = c2 - c3 * pow(abs(color), 1 / m2);
+    float3 N = max(pow(abs(color), 1 / m2) - c1, 0);
+    float3 L = pow(abs(N / M), 1 / m1);
+    L = L * 10000.0;
+    return L;
+}
+
 struct VSInput
 {
     float4 pos : POSITION;
@@ -295,8 +309,23 @@ float4 PS(VSOutput input) : SV_Target
     }
 
     // csc
-    if (constants.cs_src == ColorSpace::sRGB) {
+    if (constants.cs_src == ColorSpace::sRGB)
+    {
         c.rgb = srgb_to_linear(c.rgb);
+    }
+    else if (constants.cs_src == ColorSpace::Linear)
+    {
+    }
+    else if (constants.cs_src == ColorSpace::Rec2020PQ)
+    {
+        // BT.2020 -> BT.709
+        float3x3 mat = { 1.6605, -0.5877, -0.0728, -0.1246, 1.1330, -0.0084, -0.0182, -0.1006, 1.1187 };
+        c.rgb = pq_eotf(c.rgb);
+
+        c.r = c.r * mat[0][0] + c.g * mat[0][1] + c.b * mat[0][2];
+        c.g = c.r * mat[1][0] + c.g * mat[1][1] + c.b * mat[1][2];
+        c.b = c.r * mat[2][0] + c.g * mat[2][1] + c.b * mat[2][2];
+        c.rgb /= 80.0;
     }
 
     // tone mapping (hdr -> sdr)
