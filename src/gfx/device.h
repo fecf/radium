@@ -102,7 +102,7 @@ class DescriptorHeap {
   D3D12_DESCRIPTOR_HEAP_TYPE type() const { return type_; }
   ID3D12DescriptorHeap* get() const { return heap_.Get(); }
   Descriptor start() const { return start_; }
-  int count() const { return total_; }
+  int count() const { return reserved_ + current_; }
 
   Descriptor GetNewDescriptor();
   Descriptor GetDescriptor(int index);
