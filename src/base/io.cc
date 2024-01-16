@@ -119,7 +119,7 @@ std::string GetFullPath(const std::string& path) noexcept {
   */
 
   std::vector<wchar_t> buf(32768);
-  DWORD size = ::GetFullPathNameW(to_wstring(path).c_str(), buf.size(), buf.data(), NULL);
+  DWORD size = ::GetFullPathNameW(to_wstring(path).c_str(), (DWORD)buf.size(), buf.data(), NULL);
   return to_string(buf.data());
 }
 
