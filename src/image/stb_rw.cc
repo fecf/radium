@@ -27,24 +27,23 @@ std::unique_ptr<Image> StbRW::Decode(const uint8_t* data, size_t size) {
   uint8_t* decoded_data = nullptr;
   PixelFormatType pixel_format;
   size_t stride;
-  ColorSpaceType color_space;
+  ColorPrimaries color_primaries = ColorPrimaries::sRGB;
+  TransferCharacteristics transfer_characteristics = TransferCharacteristics::sRGB;
 
   if (is_hdr) {
     decoded_data = (uint8_t*)stbi_loadf_from_memory(data, (int)size, &x, &y, &comp, 4);
     stride = x * 4 * 4;
     pixel_format = PixelFormatType::rgba32f;
-    color_space = ColorSpaceType::Linear;
+    transfer_characteristics = TransferCharacteristics::Linear;
   } else {
     if (is_16bit) {
       decoded_data = (uint8_t*)stbi_load_16_from_memory(data, (int)size, &x, &y, &comp, 4);
       stride = x * 4 * 2;
       pixel_format = PixelFormatType::rgba16;
-      color_space = ColorSpaceType::sRGB;
     } else {
       decoded_data = (uint8_t*)stbi_load_from_memory(data, (int)size, &x, &y, &comp, 4);
       stride = x * 4;
       pixel_format = PixelFormatType::rgba8;
-      color_space = ColorSpaceType::sRGB;
     }
   }
 
@@ -57,9 +56,10 @@ std::unique_ptr<Image> StbRW::Decode(const uint8_t* data, size_t size) {
     .height = y,
     .stride = stride,
     .buffer = ImageBuffer::From(decoded_data, stride * y, stbi_image_free),
-    .pixel_format = pixel_format,
-    .color_space = color_space,
     .decoder = DecoderType::stb,
+    .pixel_format = pixel_format,
+    .color_primaries = color_primaries,
+    .transfer_characteristics = transfer_characteristics
   });
 }
 

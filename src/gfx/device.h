@@ -192,12 +192,11 @@ struct DrawCall {
 
   // shader resources
   std::weak_ptr<Resource> shader_resource;
+  std::vector<uint8_t> constant_buffer;
   std::weak_ptr<Resource> vertex_buffer;
   std::weak_ptr<Resource> index_buffer;
-  int vertex_start = 0;
   int vertex_count = 0;
-  int index_start = 0;
-  std::vector<uint8_t> constant_buffer;
+  int index_count = 0;
 };
 
 class ResourceDestructor {

@@ -24,9 +24,8 @@ std::unique_ptr<Image> LibJpegTurboRW::Decode(const uint8_t* data, size_t size) 
       .height = height,
       .stride = (size_t)width * 4,
       .buffer = ImageBuffer::Alloc(width * height * 4),
-      .pixel_format = PixelFormatType::rgba8,
-      .color_space = ColorSpaceType::sRGB,
       .decoder = DecoderType::libjpegturbo,
+      .pixel_format = PixelFormatType::rgba8,
   });
 
   ret = ::tjDecompress2(handle, data, (unsigned long)size, image->buffer->data, width,

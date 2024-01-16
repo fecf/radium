@@ -1,5 +1,5 @@
 #include "primary.h"
-
+#include "../../gfx/color_space.h"
 
 static const float pi = 3.141592635;
 
@@ -308,24 +308,42 @@ float4 PS(VSOutput input) : SV_Target
         }
     }
 
-    // csc
-    if (constants.cs_src == ColorSpace::sRGB)
+    // convert to scRGB Linear (DXGI_FORMAT_R16G16B16A16_FLOAT)
+    switch (constants.color_primaries)
     {
-        c.rgb = srgb_to_linear(c.rgb);
+        case ColorPrimaries::Unknown:
+            break;
+        case ColorPrimaries::BT709:
+            // todo:
+            break;
+        case ColorPrimaries::BT601:
+            // todo:
+            break;
+        case ColorPrimaries::BT2020:
+            // BT.2020 -> BT.709
+            float3x3 mat = { 1.6605, -0.5877, -0.0728, -0.1246, 1.1330, -0.0084, -0.0182, -0.1006, 1.1187 };
+            c.r = c.r * mat[0][0] + c.g * mat[0][1] + c.b * mat[0][2];
+            c.g = c.r * mat[1][0] + c.g * mat[1][1] + c.b * mat[1][2];
+            c.b = c.r * mat[2][0] + c.g * mat[2][1] + c.b * mat[2][2];
+            break;
     }
-    else if (constants.cs_src == ColorSpace::Linear)
+    switch (constants.transfer_characteristics)
     {
-    }
-    else if (constants.cs_src == ColorSpace::Rec2020PQ)
-    {
-        // BT.2020 -> BT.709
-        float3x3 mat = { 1.6605, -0.5877, -0.0728, -0.1246, 1.1330, -0.0084, -0.0182, -0.1006, 1.1187 };
-        c.rgb = pq_eotf(c.rgb);
-
-        c.r = c.r * mat[0][0] + c.g * mat[0][1] + c.b * mat[0][2];
-        c.g = c.r * mat[1][0] + c.g * mat[1][1] + c.b * mat[1][2];
-        c.b = c.r * mat[2][0] + c.g * mat[2][1] + c.b * mat[2][2];
-        c.rgb /= 80.0;
+        case TransferCharacteristics::Unknown:
+            c.rgb = srgb_to_linear(c.rgb);
+            break;
+        case TransferCharacteristics::sRGB:
+            c.rgb = srgb_to_linear(c.rgb);
+            break;
+        case TransferCharacteristics::Linear:
+            break;
+        case TransferCharacteristics::ST2084:
+            c.rgb = pq_eotf(c.rgb);
+            c.rgb /= 80.0;  // 125.0 = 10000 nits
+            break;
+        case TransferCharacteristics::STDB67:
+            // todo:
+            break;
     }
 
     // tone mapping (hdr -> sdr)
@@ -409,11 +427,6 @@ float4 PS(VSOutput input) : SV_Target
     else if (constants.tone_mapping == ToneMapping::ACESInverse)
     {
         c.rgb = aces_inverse(c.rgb);
-    }
-
-    // csc
-    if (constants.cs_dst == ColorSpace::sRGB) {
-        c.rgb = linear_to_srgb(c.rgb);
     }
 
     c.rgb = clamp(c.rgb, 0.0, 1.0);

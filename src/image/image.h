@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#pragma once
+#include "gfx/color_space.h"
 
 namespace rad {
 
@@ -23,23 +23,16 @@ enum class DecoderType {
 };
 
 enum class FormatType {
-  unknown,
+  Unknown,
 };
 
 enum class PixelFormatType {
-  unknown,
+  Unknown,
   rgba8,
   rgba16,
   rgba16f,
   rgba32f,
   bgra8,
-};
-
-enum class ColorSpaceType {
-  Unknown,
-  sRGB,
-  Linear,
-  Rec2100PQ,
 };
 
 enum class InterpolationType {
@@ -98,10 +91,12 @@ class Image {
   int height = 0;
   size_t stride = 0;
   std::shared_ptr<ImageBuffer> buffer;
-  FormatType format = FormatType::unknown;
-  PixelFormatType pixel_format = PixelFormatType::unknown;
-  ColorSpaceType color_space = ColorSpaceType::Unknown;
+
   DecoderType decoder = DecoderType::Unknown;
+  PixelFormatType pixel_format = PixelFormatType::Unknown;
+  ColorPrimaries color_primaries = ColorPrimaries::Unknown;
+  TransferCharacteristics transfer_characteristics = TransferCharacteristics::Unknown;
+
   std::vector<std::pair<std::string, std::string>> metadata;
 };
 

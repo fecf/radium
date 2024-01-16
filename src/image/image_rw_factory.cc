@@ -7,7 +7,7 @@
 #include "lodepng_rw.h"
 #include "pnm_rw.h"
 #include "stb_rw.h"
-#include "wic_rw.h"
+// #include "wic_rw.h"
 #include "wuffs_rw.h"
 
 namespace rad {

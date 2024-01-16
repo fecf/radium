@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <system_error>
 
-#include "base/color.h"
 #include "base/minlog.h"
 #include "base/text.h"
 #include "base/thread.h"
@@ -1182,10 +1181,9 @@ void Device::Render() {
         view.BufferLocation = index_buffer->resource->GetGPUVirtualAddress();
         view.SizeInBytes = (UINT)index_buffer->size;
         view.Format = DXGI_FORMAT_R32_UINT;
-        cmd_list->DrawIndexedInstanced(
-            dc.vertex_count, 1, dc.index_start, dc.vertex_start, 0);
+        cmd_list->DrawIndexedInstanced(dc.vertex_count, 1, 0, 0, 0);
       } else {
-        cmd_list->DrawInstanced(dc.vertex_count, 1, dc.vertex_start, 0);
+        cmd_list->DrawInstanced(dc.vertex_count, 1, 0, 0);
       }
     }
 
@@ -1377,7 +1375,6 @@ void Device::renderImGui(ComPtr<ID3D12GraphicsCommandList> ctx) {
       Descriptor srv = srv_heap_[frame_index_]->GetDescriptor(sp->srv.heap_id);
       ctx->SetGraphicsRootDescriptorTable(RS_SRV, srv.gpu);
 
-      // todo: set texture color space
       ctx->DrawIndexedInstanced(cmd.ElemCount, 1, cmd.IdxOffset + idx_offset,
           cmd.VtxOffset + vtx_offset, 0);
     }

@@ -63,6 +63,7 @@ int GetBytesPerPixel(PixelFormatType type) {
 
 }  // namespace
 
+/*
 Mesh::Mesh(std::shared_ptr<gfx::Resource> vertex_buffer, int vertex_count,
     int vertex_start, std::shared_ptr<gfx::Resource> index_buffer,
     int index_start)
@@ -82,6 +83,7 @@ Texture::Texture(std::shared_ptr<gfx::Resource> resource, int width, int height,
       array_size(array_size),
       array_src_width(array_src_width),
       array_src_height(array_src_height) {}
+      */
 
 uint64_t Texture::id() const { return (uint64_t)resource->id; }
 
@@ -190,9 +192,16 @@ std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
     }
     device_->UploadResource2DBatch(resource, descs);
 
-    return std::make_unique<Texture>(resource, tile, tile,
-        (ColorSpace)image->color_space, array_size, image->width,
-        image->height);
+    return std::unique_ptr<Texture>(new Texture{
+        .resource = resource,
+        .width = tile,
+        .height = tile,
+        .array_size = array_size,
+        .array_src_width = image->width,
+        .array_src_height = image->height,
+        .color_primaries = image->color_primaries,
+        .transfer_characteristics = image->transfer_characteristics,
+    });
   } else {
     std::shared_ptr<gfx::Resource> resource =
         device_->CreateTexture(image->width, image->height, dxgi_format);
@@ -211,11 +220,20 @@ std::unique_ptr<Texture> Engine::CreateTexture(const Image* image, bool tiled) {
     desc.src_height = image->height;
     device_->UploadResource2DBatch(resource, {desc});
 
-    return std::make_unique<Texture>(resource, image->width, image->height, (ColorSpace)image->color_space);
+    return std::unique_ptr<Texture>(new Texture{
+        .resource = resource,
+        .width = image->width,
+        .height = image->height,
+        .array_size = 1,
+        .array_src_width = image->width,
+        .array_src_height = image->height,
+        .color_primaries = image->color_primaries,
+        .transfer_characteristics = image->transfer_characteristics,
+    });
   }
 }
 
-std::unique_ptr<Mesh> Engine::CreateMesh() {
+std::unique_ptr<Model> Engine::CreatePlane() {
   const float x = 0.5f;
   const float y = 0.5f;
   const float z = 0.5f;
@@ -234,33 +252,36 @@ std::unique_ptr<Mesh> Engine::CreateMesh() {
   data[4].uv = {0.0f, 0.0f};
   data[5].uv = {1.0f, 0.0f};
 
-  std::shared_ptr<gfx::Resource> vb = device_->CreateDynamicBuffer(
-      sizeof(gfx::InputLayout) * data.size());
+  std::shared_ptr<gfx::Resource> vb =
+      device_->CreateDynamicBuffer(sizeof(gfx::InputLayout) * data.size());
   vb->Upload(data.data(), sizeof(gfx::InputLayout) * data.size());
-  return std::make_unique<Mesh>(vb, 6); 
+  return std::unique_ptr<Model>(new Model{
+      .vertex_buffer = vb,
+      .vertex_count = 6,
+  });
 }
 
 void Engine::Draw() {
   using namespace linalg;
 
+  static auto view = world_.view<Mesh>();
+
   Window::Rect rect = window_->GetClientRect();
   float4 viewport{0, 0, (float)rect.width, (float)rect.height};
   int4 scissor{0, 0, rect.width, rect.height};
 
-  std::vector<gfx::DrawCall> drawcalls;
-
-  world_.sort<Render>([&](const entt::entity lhs, const entt::entity rhs) { 
-    auto a = world().get<Render>(lhs).priority;
-    auto b = world().get<Render>(rhs).priority;
+  world_.sort<Mesh>([&](const entt::entity lhs, const entt::entity rhs) { 
+    auto a = world().get<Mesh>(lhs).order;
+    auto b = world().get<Mesh>(rhs).order;
     if (a == b) return (lhs < rhs);
     return a < b;
   });
 
-  static auto view = world_.view<Render>();
-  view.each([&](const entt::entity e, const Render& re) {
+  std::vector<gfx::DrawCall> drawcalls;
+  view.each([&](const entt::entity e, const Mesh& re) {
     using namespace linalg;
 
-    if (re.bypass) {
+    if (!re.enabled) {
       return;
     }
 
@@ -302,23 +323,22 @@ void Engine::Draw() {
     mvp = mul(mvp, v);
     dc.mvp = mvp;
 
-    if (re.mesh) {
-      dc.vertex_buffer = re.mesh->vertex_buffer;
-      dc.vertex_count  = re.mesh->vertex_count;
-      dc.vertex_start  = re.mesh->vertex_start;
-      dc.index_buffer  = re.mesh->index_buffer;
-      dc.index_start   = re.mesh->index_start;
+    if (re.model) {
+      dc.vertex_buffer = re.model->vertex_buffer;
+      dc.vertex_count  = re.model->vertex_count;
+      dc.index_buffer  = re.model->index_buffer;
+      dc.index_count = re.model->index_count;
 
-      if (re.texture) {
-        dc.shader_resource  = re.texture->resource;
-        dc.array_src_width  = re.texture->array_src_width;
-        dc.array_src_height = re.texture->array_src_height;
+      if (re.material && re.material->texture) {
+        dc.shader_resource  = re.material->texture->resource;
+        dc.array_src_width  = re.material->texture->array_src_width;
+        dc.array_src_height = re.material->texture->array_src_height;
 
         Constants constants{};
-        constants.alpha = re.alpha;
+        constants.alpha = re.material->alpha;
         constants.filter = ::Filter::Bilinear;
-        constants.cs_src = re.texture->color_space;
-        constants.cs_dst = ::ColorSpace::Linear;
+        constants.color_primaries = re.material->texture->color_primaries;
+        constants.transfer_characteristics = re.material->texture->transfer_characteristics;
         dc.constant_buffer.resize(sizeof(constants));
         memcpy(dc.constant_buffer.data(), &constants, sizeof(constants));
       }
@@ -326,6 +346,10 @@ void Engine::Draw() {
 
     drawcalls.emplace_back(dc);
   });
+
+  for (const auto& dc : drawcalls) {
+
+  }
 
   device_->Submit(drawcalls);
 }

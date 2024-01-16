@@ -18,15 +18,14 @@ std::unique_ptr<Image> rad::LodePngRW::Decode(
     return {};
   }
 
-  ColorSpaceType color_space;
-  std::string iccp_name;
+  ColorPrimaries color_primaries = ColorPrimaries::Unknown;
+  TransferCharacteristics transfer_characteristics = TransferCharacteristics::Unknown;
   if (state.info_png.iccp_name != nullptr) {
-    iccp_name = state.info_png.iccp_name;
-  }
-  if (iccp_name == "Rec.2100 PQ") {
-    color_space = ColorSpaceType::Rec2100PQ;
-  } else {
-    color_space = ColorSpaceType::sRGB;
+    std::string iccp_name = state.info_png.iccp_name;
+    if (iccp_name == "Rec.2100 PQ") {
+      color_primaries = ColorPrimaries::BT2020;
+      transfer_characteristics = TransferCharacteristics::ST2084;
+    }
   }
 
   std::unique_ptr<Image> image(new Image{
@@ -34,9 +33,10 @@ std::unique_ptr<Image> rad::LodePngRW::Decode(
       .height = (int)h,
       .stride = (size_t)w * 4,
       .buffer = ImageBuffer::Alloc(w * h * 4),
-      .pixel_format = PixelFormatType::rgba8,
-      .color_space = color_space,
       .decoder = DecoderType::lodepng,
+      .pixel_format = PixelFormatType::rgba8,
+      .color_primaries = color_primaries,
+      .transfer_characteristics = transfer_characteristics,
   });
   ::memcpy_s(image->buffer->data, image->buffer->size, out.data(), out.size());
 

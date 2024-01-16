@@ -62,9 +62,8 @@ std::unique_ptr<Image> PnmRW::Decode(const uint8_t* data, size_t size) {
       .height = h,
       .stride = (size_t)w * 4,
       .buffer = ImageBuffer::Alloc(w * h * 4),
-      .pixel_format = PixelFormatType::rgba8,
-      .color_space = ColorSpaceType::sRGB,
       .decoder = DecoderType::pnm,
+      .pixel_format = PixelFormatType::rgba8,
   });
 
   if (depth == 8) {

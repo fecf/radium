@@ -127,13 +127,6 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
       throw std::runtime_error("failed to avifDecoderParse().");
     }
 
-
-    if (decoder->image->depth == 8) {
-
-    } else if (decoder->image->depth > 8) {
-
-    }
-
     avifRGBImage rgb{};
     avifRGBImageSetDefaults(&rgb, decoder->image);
     rgb.chromaUpsampling = AVIF_CHROMA_UPSAMPLING_AUTOMATIC;
@@ -141,15 +134,41 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
     rgb.format = AVIF_RGB_FORMAT_RGBA;
 
     PixelFormatType pixel_format = PixelFormatType::rgba8;
-    ColorSpaceType color_space = ColorSpaceType::sRGB;
+    ColorPrimaries color_primaries = ColorPrimaries::BT709;
+    TransferCharacteristics transfer_characteristics =
+        TransferCharacteristics::sRGB;
     size_t stride = decoder->image->width * 4;
     size_t size = decoder->image->width * 4 * decoder->image->height;
     if (rgb.depth == 16) {
-      rgb.isFloat = true;
-      pixel_format = PixelFormatType::rgba16f;
-      color_space = ColorSpaceType::Linear;
+      pixel_format = PixelFormatType::rgba16;
       stride = decoder->image->width * 8;
       size = decoder->image->width * 8 * decoder->image->height;
+    }
+    if (decoder->image->colorPrimaries == AVIF_COLOR_PRIMARIES_BT2020) {
+      color_primaries = ColorPrimaries::BT2020;
+    } else if (decoder->image->colorPrimaries == AVIF_COLOR_PRIMARIES_BT601) {
+      color_primaries = ColorPrimaries::BT601;
+    } else if (decoder->image->colorPrimaries == AVIF_COLOR_PRIMARIES_BT709) {
+      color_primaries = ColorPrimaries::BT709;
+    } else {
+      LOG_F(INFO, "not supported avifColorPrimaries(%d)",
+          decoder->image->colorPrimaries);
+    }
+    if (decoder->image->transferCharacteristics ==
+        AVIF_TRANSFER_CHARACTERISTICS_SMPTE2084) {
+      transfer_characteristics = TransferCharacteristics::ST2084;
+    } else if (decoder->image->transferCharacteristics ==
+               AVIF_TRANSFER_CHARACTERISTICS_HLG) {
+      transfer_characteristics = TransferCharacteristics::STDB67;
+    } else if (decoder->image->transferCharacteristics ==
+               AVIF_TRANSFER_CHARACTERISTICS_SRGB) {
+      transfer_characteristics = TransferCharacteristics::sRGB;
+    } else if (decoder->image->transferCharacteristics ==
+               AVIF_TRANSFER_CHARACTERISTICS_LINEAR) {
+      transfer_characteristics = TransferCharacteristics::Linear;
+    } else {
+      LOG_F(INFO, "not supported avifTransferCharacteristics(%d)",
+          decoder->image->transferCharacteristics);
     }
 
     std::unique_ptr<Image> image(new Image{
@@ -157,9 +176,10 @@ std::unique_ptr<Image> LibAvifRW::Decode(const uint8_t* data, size_t size) {
         .height = (int)decoder->image->height,
         .stride = stride,
         .buffer = ImageBuffer::Alloc(size),
-        .pixel_format = pixel_format,
-        .color_space = color_space,
         .decoder = DecoderType::libavif,
+        .pixel_format = pixel_format,
+        .color_primaries = color_primaries,
+        .transfer_characteristics = transfer_characteristics,
         .metadata =
             {
                 {"depth", std::to_string(decoder->image->depth)},

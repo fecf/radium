@@ -23,55 +23,47 @@ namespace rad {
 namespace gfx {
 class Device;
 class Resource;
+struct DrawCall;
 }  // namespace gfx
 
 constexpr int kTileSize = 2048;
 
-struct Mesh {
-  Mesh(std::shared_ptr<gfx::Resource> vertex_buffer, int vertex_count,
-      int vertex_start = 0, std::shared_ptr<gfx::Resource> index_buffer = {},
-      int index_start = 0);
-
-  std::shared_ptr<gfx::Resource> vertex_buffer;
-  int vertex_count;
-  int vertex_start;
-  std::shared_ptr<gfx::Resource> index_buffer;
-  int index_start;
+struct Texture {
+  uint64_t id() const;
+  std::shared_ptr<gfx::Resource> resource;
+  int width = 0;
+  int height = 0;
+  int array_size = 0;
+  int array_src_width = 0;
+  int array_src_height = 0;
+  ColorPrimaries color_primaries = ColorPrimaries::Unknown;
+  TransferCharacteristics transfer_characteristics = TransferCharacteristics::Unknown;
 };
 
-struct Texture {
-  Texture(std::shared_ptr<gfx::Resource> resource, int width, int height,
-      ColorSpace color_space, int array_size = 1, int array_src_width = 0,
-      int array_src_height = 0);
+struct Model {
+  std::shared_ptr<gfx::Resource> vertex_buffer;
+  std::shared_ptr<gfx::Resource> index_buffer;
+  int vertex_count = 0;
+  int index_count = 0;
+};
 
-  uint64_t id() const;
+struct Material {
+  float alpha = 1.0f;
+  float4 tint = float4(1.0f, 0.0f, 0.0f, 1.0f);
+  std::shared_ptr<Texture> texture;
+};
 
-  std::shared_ptr<gfx::Resource> resource;
-  int width;
-  int height;
-  int array_size;
-  int array_src_width;
-  int array_src_height;
-  ColorSpace color_space;
+struct Mesh {
+  std::shared_ptr<Model> model;
+  std::shared_ptr<Material> material;
+  bool enabled = true;
+  int order = 0;
 };
 
 struct Transform {
   float3 translate;
   float3 rotate;
   float3 scale;
-};
-
-struct Render {
-  int priority = 0;
-  bool bypass = false;
-
-  // mesh
-  std::shared_ptr<Mesh> mesh;
-
-  // material
-  float alpha = 1.0f;
-  float4 color = float4(1.0f, 0.0f, 0.0f, 1.0f);
-  std::shared_ptr<Texture> texture;
 };
 
 class Engine {
@@ -91,7 +83,7 @@ class Engine {
   nlohmann::json GetStats() const;
 
   std::unique_ptr<Texture> CreateTexture(const Image* image, bool tiled = false);
-  std::unique_ptr<Mesh> CreateMesh();
+  std::unique_ptr<Model> CreatePlane();
 
  private:
   std::unique_ptr<gfx::Device> device_;

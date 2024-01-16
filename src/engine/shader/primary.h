@@ -1,15 +1,10 @@
 #pragma once
 
+#include "../../gfx/color_space.h"
+
 enum class Filter : int {
   Nearest = 0,
   Bilinear,
-};
-
-enum class ColorSpace : int {
-  Unknown = 0,
-  sRGB,
-  Linear,
-  Rec2020PQ,
 };
 
 enum class ToneMapping : int {
@@ -32,8 +27,11 @@ enum class Colorblind : int {
 #pragma pack(push, 1)
 struct Constants {
   float alpha;       // 0.0f ~ 1.0f
-  ColorSpace cs_src;
-  ColorSpace cs_dst;
+  
+  // color profile of texteure
+  ColorPrimaries color_primaries;
+  TransferCharacteristics transfer_characteristics;
+
   Filter filter;
   float brightness;  // -1.0f ~ 1.0f
   float contrast;    // -1.0f ~ 1.0f
