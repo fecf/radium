@@ -11,7 +11,8 @@
 #include <thread>
 
 #include <windows.h>
-#include <winrt/base.h>
+
+#include "text.h"
 
 namespace minlog {
 
@@ -89,7 +90,7 @@ class Logger {
 
     std::string msg;
     if (g_timestamp) {
-      msg += ssprintf("%s ", timestamp.c_str());
+      msg += timestamp + " ";
     }
     if (g_elapsed) {
       msg += ssprintf("[%.04f] ", elapsed);
@@ -103,33 +104,25 @@ class Logger {
     if (g_function) {
       msg += ssprintf("%s() ", entry.function);
     }
-    msg += ssprintf("%s", entry.message.c_str());
+    msg += entry.message;
     return msg;
   }
+
   void thread() {
-    while (true) {
+    Entry entry;
+    while (!exit_ || queue_.size()) {
       {
         std::unique_lock lock(mutex_);
         cv_.wait(lock, [&] { return exit_ || queue_.size(); });
+        if (exit_) break;
+
+        entry = std::move(queue_.front());
+        queue_.pop();
       }
 
-      if (exit_) {
-        break;
-      }
-
-      Entry entry;
-      while (queue_.size()) {
-        {
-          std::unique_lock lock(mutex_);
-          entry = std::move(queue_.front());
-          queue_.pop();
-        }
-
-        const std::string msg = generate(entry);
-
-        for (Sink& writer : sinks_[entry.severity]) {
-          writer(msg.c_str());
-        }
+      const std::string msg = generate(entry);
+      for (Sink& writer : sinks_[entry.severity]) {
+        writer(msg.c_str());
       }
     }
   }
@@ -180,8 +173,7 @@ Sink cerr() {
 
 Sink debug() {
   return [](const char* msg) {
-    std::wstring utf16 =
-        (std::wstring)winrt::to_hstring(std::string(msg)) + L"\n";
+    std::wstring utf16 = rad::to_wstring(msg) + L"\n";
     ::OutputDebugStringW(utf16.c_str());
   };
 }

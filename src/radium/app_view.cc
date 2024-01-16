@@ -338,9 +338,10 @@ void View::renderImGui() {
 }
 
 void View::renderContent() {
-  for (auto content : m.contents) {
-    rad::Render& render = world().get_or_emplace<rad::Render>(content->e);
-    render.bypass = true;
+  for (const auto& content : m.contents) {
+    if (rad::Mesh* mesh = world().try_get<rad::Mesh>(content->e)) {
+      mesh->enabled = false;
+    }
   }
 
   std::shared_ptr<Model::Content> content = m.GetContent();
@@ -349,12 +350,19 @@ void View::renderContent() {
   }
 
   if (content && content->image && content->texture) {
-    rad::Render& render = world().get_or_emplace<rad::Render>(content->e);
-    render.bypass = false;
-    render.priority = 0;
-    render.alpha = m.thumbnail_show ? 0.1f : 1.0f;
-    render.mesh = content->mesh;
-    render.texture = content->texture;
+    rad::Mesh* mesh = world().try_get<rad::Mesh>(content->e);
+    if (!mesh) {
+      mesh = &world().emplace<rad::Mesh>(content->e,
+          rad::Mesh{
+              .model = engine().CreatePlane(),
+              .material = std::shared_ptr<rad::Material>(new rad::Material{
+                  .alpha = m.thumbnail_show ? 0.1f : 1.0f,
+                  .texture = content->texture,
+              }),
+              .order = 0,
+          });
+    }
+    mesh->enabled = true;
 
     float scaled_w = content->image->width * m.content_zoom;
     float scaled_h = content->image->height * m.content_zoom;
@@ -390,15 +398,22 @@ void View::renderContent() {
 
 void View::renderThumbnail() {
   for (const auto& [path, thumbnail] : m.thumbnails) {
-    if (!thumbnail->texture || !thumbnail->mesh) {
+    if (!thumbnail->texture) {
       continue;
     }
 
-    rad::Render& render = world().get_or_emplace<rad::Render>(thumbnail->e);
-    render.alpha = 1.0f;
-    render.priority = 1;
-    render.mesh = thumbnail->mesh;
-    render.texture = thumbnail->texture;
+    rad::Mesh* mesh = world().try_get<rad::Mesh>(thumbnail->e);
+    if (!mesh) {
+      mesh = &world().emplace<rad::Mesh>(thumbnail->e,
+          rad::Mesh{
+              .model = engine().CreatePlane(),
+              .material = std::shared_ptr<rad::Material>(
+                  new rad::Material{.texture = thumbnail->texture}),
+              .order = 1,
+          });
+    }
+    mesh->material->alpha = 1.0f;
+    mesh->enabled = m.thumbnail_show;
 
     float scale =
         rad::scale_to_fit(thumbnail->texture->width, thumbnail->texture->height,

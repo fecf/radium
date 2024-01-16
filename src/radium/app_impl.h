@@ -28,7 +28,6 @@ struct Model {
 public:
   struct Content;
 
-  void PushMRU(const std::string& path);
   const std::shared_ptr<Content> GetContent() const;
   const std::shared_ptr<Content> GetPresentContent() const;
 
@@ -57,10 +56,9 @@ public:
     std::string path;
     std::shared_ptr<rad::Image> image;
     std::shared_ptr<rad::Texture> texture;
-    std::shared_ptr<rad::Mesh> mesh;
     std::chrono::system_clock::time_point timestamp;
+    int64_t task_id = 0;
     bool completed = false;
-
     entt::entity e;
   };
   std::vector<std::shared_ptr<Content>> contents;
@@ -68,15 +66,13 @@ public:
   struct Thumbnail {
     std::string path;
     std::shared_ptr<rad::Texture> texture;
-    std::shared_ptr<rad::Mesh> mesh;
     int last_shown_frame = 0;
     std::chrono::system_clock::time_point timestamp;
-
     float target_x = 0;
     float target_y = 0;
     float target_width = 0;
     float target_height = 0;
-
+    int64_t task_id = 0;
     entt::entity e;
   };
   std::unordered_map<std::string, std::shared_ptr<Thumbnail>> thumbnails;
@@ -138,6 +134,7 @@ struct Intent {
   void Dispatch(Action a);
   std::shared_ptr<Model::Content> PrefetchContent(const std::string& path);
   std::shared_ptr<Model::Thumbnail> PrefetchThumbnail(const std::string& path, int size);
+  void PresentContent(std::shared_ptr<Model::Content> content);
   void EvictUnusedContent();
   void EvictUnusedThumbnail();
 

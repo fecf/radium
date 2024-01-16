@@ -36,30 +36,36 @@ struct Timer {
 
 class ThreadPool {
  public:
-  using Func = std::function<void()>;
-  struct Task {
-    Func func;
-    uint64_t tag;
-  };
+  using TaskId = int64_t;
+  using TaskFunc = std::function<void()>;
 
-  ThreadPool();
-  ThreadPool(int concurrency);
+  ThreadPool(size_t concurrency);
   ~ThreadPool();
 
-  void Post(Func func, uint64_t tag = 0);
-  void Cancel();
-  void Cancel(uint64_t tag);
-  void Wait();
+  TaskId Post(TaskFunc func);
+  bool TryCancel(TaskId id);
+  bool TryCancelAll();
+  void Wait(TaskId id);
+  void WaitAll();
 
-  int runnings() const { return running_; }
-  int remainings() const { return (int)tasks_.size(); }
+  size_t running_count() const { return running_count_; }
+  size_t remaining_count() const { return task_map_.size(); }
+
+  static thread_local TaskId CurrentTaskId;
 
  private:
+  void worker();
+
+ private:
+  std::vector<std::thread> workers_;
+  std::atomic<bool> exit_;
+
   std::mutex mutex_;
-  std::vector<Task> tasks_;
-  std::vector<std::future<void>> futures_;
-  std::atomic<int> running_;
   std::condition_variable cv_;
+  std::map<TaskId, TaskFunc> task_map_;
+  std::atomic<TaskId> next_task_id_;
+
+  std::atomic<size_t> running_count_;
 };
 
 }  // namespace rad

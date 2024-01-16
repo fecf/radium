@@ -29,6 +29,7 @@ std::string getSettingsPath() {
 int main(int argc, char** argv) {
 #ifdef _DEBUG
   ::AllocConsole();
+  ::SetConsoleOutputCP(CP_UTF8);
   FILE* fout = nullptr;
   ::freopen_s(&fout, "CONOUT$", "w", stdout);
 
@@ -139,16 +140,16 @@ void App::Start(int argc, char** argv) {
   saveSettings();
 
   // release all resources
-  pool_content.Wait();
-  pool_thumbnail.Wait();
+  pool_content.WaitAll();
+  pool_thumbnail.WaitAll();
   m.contents.clear();
   m.thumbnails.clear();
   processDeferredTasks();
   imgui_font_atlas_.reset();
   ServiceLocator::Clear();
 
-  assert(pool_content.remainings() == 0);
-  assert(pool_thumbnail.remainings() == 0);
+  assert(pool_content.remaining_count() == 0);
+  assert(pool_thumbnail.remaining_count() == 0);
   assert(deferred_tasks_.empty());
 
   engine().Destroy();
@@ -291,7 +292,6 @@ void App::uploadImGuiFonts() {
       .buffer = rad::ImageBuffer::From(
           pixels, width * bpp * height, [](void* ptr) { delete ptr; }),
       .pixel_format = rad::PixelFormatType::rgba8,
-      .color_space = rad::ColorSpaceType::sRGB,
   });
   imgui_font_atlas_ = engine().CreateTexture(image.get());
   ImTextureID texture_id = reinterpret_cast<ImTextureID>(imgui_font_atlas_->id());

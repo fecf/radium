@@ -30,11 +30,6 @@ void View::renderImGuiOverlay() {
     return;
   }
 
-  auto content = m.GetPresentContent();
-  if (!content || !content->image || !content->texture) {
-    return;
-  }
-
   ImGui::SetNextWindowPos({0, 0});
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
@@ -58,20 +53,29 @@ void View::renderImGuiOverlay() {
     if (debug) {
       ImGui::BeginGroup();
       std::string imgui = std::format("fps:{:.04f} | delta:{:.04f}", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime);
-      ImGui::Text(imgui.c_str());
+      ImGui::Text("%s", imgui.c_str());
+
+      std::string thread = std::format("content:{}/{} | thumbnail:{}/{}",
+          a.pool_content.running_count(), a.pool_content.remaining_count(),
+          a.pool_thumbnail.running_count(),
+          a.pool_thumbnail.remaining_count());
+      ImGui::Text("%s", thread.c_str());
 
       std::string layout =
           std::format("center:{:.2f}, {:.2f} | rotate:{:.2f} | scale:{:.2f}",
               m.content_cx, m.content_cy, m.content_rotate, m.content_zoom);
-      ImGui::Text(layout.c_str());
+      ImGui::Text("%s", layout.c_str());
 
-      auto ss = magic_enum::enum_name(content->image->pixel_format);
-      std::string detail = std::format("{} | {} | {}",
-        magic_enum::enum_name(content->image->decoder).data(),
-        magic_enum::enum_name(content->image->pixel_format).data(),
-        magic_enum::enum_name(content->image->color_space).data()
-      );
-      ImGui::Text("%s", detail.c_str());
+      auto content = m.GetPresentContent();
+      if (content && content->image) {
+        auto ss = magic_enum::enum_name(content->image->pixel_format);
+        std::string detail = std::format("{} | {} | {}",
+          magic_enum::enum_name(content->image->decoder).data(),
+          magic_enum::enum_name(content->image->pixel_format).data(),
+          magic_enum::enum_name(content->image->color_primaries).data()
+        );
+        ImGui::Text("%s", detail.c_str());
+      }
 
       ImGui::Text("%s", m.cwd.c_str());
       for (const auto sp : m.contents) {
@@ -95,16 +99,21 @@ void View::renderImGuiOverlay() {
 
       ImGui::EndGroup();
       ImGui::GetBackgroundDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
-      ImGui::Dummy({1.0f, spacing});
+
+      ImGui::Indent(ImGui::GetItemRectMax().x + 8.0f);
+      ImGui::SetCursorPosY(0.0f);
     }
 
     // std::string filename = m.content_path;
+    auto content = m.GetPresentContent();
     std::filesystem::path fspath(rad::to_wstring(m.present_content_path));
     std::string filename = rad::to_string(fspath.filename().u8string());
 
     std::string str = filename;
-    str += std::format(" | {}x{}", content->image->width, content->image->height);
-    str += std::format(" | {:.2f}x", m.content_zoom);
+    if (content && content->image) {
+      str += std::format(" | {}x{}", content->image->width, content->image->height);
+      str += std::format(" | {:.2f}x", m.content_zoom);
+    }
     // str += std::format(" | {}", magic_enum::enum_name(content->image->pixel_format).data());
     // str += std::format(" | {}", magic_enum::enum_name(content->image->color_space).data());
 
@@ -122,7 +131,7 @@ void View::renderImGuiOverlay() {
     ImGui::GetBackgroundDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
     ImGui::Dummy({1.0, spacing});
 
-    if (content->image->metadata.size()) {
+    if (content && content->image && content->image->metadata.size()) {
       for (const auto& [key, value] : content->image->metadata) {
         std::string str = std::format("{}: {}", key.c_str(), value.c_str());
         ImGui::Text("%s", str.c_str());

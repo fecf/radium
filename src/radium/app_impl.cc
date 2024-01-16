@@ -20,6 +20,8 @@
 #include "material_symbols.h"
 #include "service_locator.h"
 
+constexpr int kPrefetchStartDelayMs = 16;
+
 void Intent::Dispatch(Action action) {
   const auto type_name = typeid(action).name();
   Visitor v{
@@ -151,14 +153,24 @@ void Intent::openImpl(const std::string& path) {
   }
 
   std::string fullpath = rad::GetFullPath(path);
-  if (fullpath.empty()) {
-    fullpath = path;
-  }
+  std::error_code ec;
   std::filesystem::path fspath(rad::to_wstring(fullpath));
+  if (!std::filesystem::is_regular_file(fspath, ec) || ec) {
+    return;
+  }
 
   // set content path
   m.content_path = fullpath;
-  m.PushMRU(fullpath);
+
+  // add to mru list
+  auto it = std::remove(m.mru.begin(), m.mru.end(), path);
+  if (it != m.mru.end()) {
+    m.mru.erase(it, m.mru.end());
+  }
+  m.mru.push_front(path);
+  while (m.mru.size() > 20) {
+    m.mru.erase(std::prev(m.mru.end()));
+  }
 
   // set window title
   std::string title = std::format("{} - {}", kAppName, fullpath);
@@ -166,122 +178,122 @@ void Intent::openImpl(const std::string& path) {
 
   // change cwd
   bool changed = false;
-  std::error_code ec;
-  bool is_dir = std::filesystem::is_directory(fspath, ec);
-  if (!ec) {
-    if (!is_dir) fspath = fspath.parent_path();
-    std::string cwd = rad::to_string(fspath.wstring());
-    if (m.cwd != cwd) {
-      m.cwd = cwd;
-      changed = true;
-    }
-
-    std::filesystem::file_time_type modified =
-        std::filesystem::last_write_time(fspath, ec);
-    if (!ec && m.cwd_last_modified != modified) {
-      m.cwd_last_modified = modified;
-      changed = true;
-    }
-
-    if (changed) {
-      m.cwd_entries.clear();
-      std::filesystem::directory_iterator dir(fspath, ec);
-      for (const auto& entry : dir) {
-        if (entry.is_regular_file()) {
-          m.cwd_entries.emplace_back(rad::to_string(entry.path().wstring()));
-        }
+  std::filesystem::path fsdir = fspath.parent_path();
+  std::string dir = rad::to_string(fsdir.wstring());
+  if (m.cwd != dir) {
+    m.cwd = dir;
+    changed = true;
+  }
+  std::filesystem::file_time_type modified =
+      std::filesystem::last_write_time(fsdir, ec);
+  if (m.cwd_last_modified != modified && !ec) {
+    m.cwd_last_modified = modified;
+    changed = true;
+  }
+  if (changed) {
+    m.cwd_entries.clear();
+    std::filesystem::directory_iterator dir(fsdir, ec);
+    for (const auto& entry : dir) {
+      if (entry.is_regular_file()) {
+        m.cwd_entries.emplace_back(rad::to_string(entry.path().wstring()));
       }
-
-      std::sort(m.cwd_entries.begin(), m.cwd_entries.end(),
-          [](const std::string& a, const std::string& b) {
-            if (rad::natural_sort::strnatcasecmp(rad::to_wstring(a).c_str(),
-                    rad::to_wstring(b).c_str()) == -1)
-              return true;
-            else
-              return false;
-          });
     }
+
+    std::sort(m.cwd_entries.begin(), m.cwd_entries.end(),
+        [](const std::string& a, const std::string& b) {
+          if (rad::natural_sort::strnatcasecmp(rad::to_wstring(a).c_str(),
+                  rad::to_wstring(b).c_str()) == -1)
+            return true;
+          else
+            return false;
+        });
   }
 
-  PrefetchContent(fullpath);
-  std::string prev, next;
-  auto it = std::find_if(m.cwd_entries.begin(), m.cwd_entries.end(),
+  // prefetch content
+  std::shared_ptr<Model::Content> content = PrefetchContent(fullpath);
+  if (content && content->completed) {
+    PresentContent(content);
+  }
+  
+  // prefetch adjacent content
+  auto it2 = std::find_if(m.cwd_entries.begin(), m.cwd_entries.end(),
       [&](const std::string& p) { return p == fullpath; });
-  if (it != m.cwd_entries.end()) {
-    auto itp = (it == m.cwd_entries.begin()) ? std::prev(m.cwd_entries.end())
-                                             : std::prev(it);
-    auto itn = (it == std::prev(m.cwd_entries.end())) ? m.cwd_entries.begin()
-                                                      : std::next(it);
-    prev = *itp;
-    next = *itn;
-    PrefetchContent(prev);
-    PrefetchContent(next);
+  if (it2 != m.cwd_entries.end()) {
+    auto prev = (it2 == m.cwd_entries.begin()) ? std::prev(m.cwd_entries.end())
+                                               : std::prev(it2);
+    auto next = (it2 == std::prev(m.cwd_entries.end())) ? m.cwd_entries.begin()
+                                                        : std::next(it2);
+    PrefetchContent(*prev);
+    PrefetchContent(*next);
   }
 }
 
 std::shared_ptr<Model::Content> Intent::PrefetchContent(
     const std::string& path) {
-  auto prefetchFinished = [=](const std::string& path) {
-    if (m.content_path == path) {
-      auto it = std::find_if(m.contents.begin(), m.contents.end(),
-          [=](const std::shared_ptr<Model::Content>& c) {
-            return c->path == path;
-          });
-      if (it != m.contents.end()) {
-        m.present_content_path = path;
-        Dispatch(Reset{});
-      }
-    }
-  };
-
   auto it = std::find_if(m.contents.begin(), m.contents.end(),
       [=](const std::shared_ptr<Model::Content>& c) {
         return c->path == path;
       });
-  if (it == m.contents.end()) {
-    auto content = std::shared_ptr<Model::Content>(new Model::Content(), [=](auto* ptr) {
-          a.PostDeferredTask([=] {
-            world().destroy(ptr->e);
-            delete ptr;
-          });
-        });
-    content->path = path;
-    content->e = world().create();
-    m.contents.emplace_back(content);
-
-    a.pool_content.Post([=, c = std::weak_ptr<Model::Content>(content)] {
-      std::this_thread::sleep_for(std::chrono::milliseconds(16));
-      if (auto sp = c.lock()) {
-        auto result = ServiceLocator::Get<ContentImageProvider>()->Request(sp->path);
-        sp->image = std::move(result.image);
-        if (sp->image) {
-          sp->image->buffer.reset();  // no need to use
-        }
-        sp->texture = std::move(result.texture);
-        sp->mesh = engine().CreateMesh();
-        sp->timestamp = std::chrono::system_clock::now();
-        sp->completed = true;
-        a.PostDeferredTask([=] { prefetchFinished(path); });
-      } else {
-        LOG_F(INFO, "task (%s) already deleted", path.c_str());
-      }
-    });
-    return content;
-  } else {
-    if ((*it)->completed) {
-      prefetchFinished(path);
-    }
+  if (it != m.contents.end()) {
     return (*it);
   }
+
+  auto content = std::shared_ptr<Model::Content>(
+      new Model::Content(), [=](Model::Content* ptr) {
+        auto task_id = ptr->task_id;
+        auto entity = ptr->e;
+        a.PostDeferredTask([=] {
+          a.pool_content.TryCancel(task_id);
+          world().destroy(entity);
+          delete ptr;
+        });
+      });
+  content->path = path;
+  content->e = world().create();
+  m.contents.emplace_back(content);
+
+  auto wp = std::weak_ptr<Model::Content>(content);
+  a.pool_content.Post([=] {
+    if (wp.expired()) {
+      LOG_F(INFO, "task (%s) already deleted (1)", path.c_str());
+      return;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPrefetchStartDelayMs));
+    auto result = ServiceLocator::Get<ContentImageProvider>()->Request(path);
+
+    if (auto sp = wp.lock()) {
+      sp->image = std::move(result.image);
+      if (sp->image) {
+        sp->image->buffer.reset();  // no need to use
+      }
+      sp->texture = std::move(result.texture);
+      sp->timestamp = std::chrono::system_clock::now();
+      sp->completed = true;
+      sp->task_id = rad::ThreadPool::CurrentTaskId;
+
+      a.PostDeferredTask([=] { 
+        if (sp->path == m.content_path) {
+          PresentContent(sp);
+        }
+      });
+    } else {
+      LOG_F(INFO, "task (%s) already deleted (2)", path.c_str());
+    }
+  });
+  return content;
 }
 
 std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
     const std::string& path, int size) {
   if (!m.thumbnails.contains(path)) {
     auto thumbnail = std::shared_ptr<Model::Thumbnail>(
-        new Model::Thumbnail(), [=](auto* ptr) {
+        new Model::Thumbnail(), [=](Model::Thumbnail* ptr) {
+          auto task_id = ptr->task_id;
+          auto entity = ptr->e;
           a.PostDeferredTask([=] {
-            world().destroy(ptr->e);
+            a.pool_thumbnail.TryCancel(task_id);
+            world().destroy(entity);
             delete ptr;
           });
         });
@@ -289,14 +301,20 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
     thumbnail->e = world().create();
     m.thumbnails.emplace(path, thumbnail);
 
-    a.pool_thumbnail.Post([=, c = std::weak_ptr<Model::Thumbnail>(thumbnail)] {
-      if (auto sp = c.lock()) {
+    auto wp = std::weak_ptr<Model::Thumbnail>(thumbnail);
+    a.pool_thumbnail.Post([=] {
+      if (wp.expired()) {
+        LOG_F(INFO, "task (%s) already deleted (1)", path.c_str());
+        return;
+      }
+
+      if (auto sp = wp.lock()) {
         sp->texture = ServiceLocator::Get<ThumbnailImageProvider>()->Request(sp->path, size);
         if (!sp->texture) {
           return;
         }
         sp->timestamp = std::chrono::system_clock::now();
-        sp->mesh = engine().CreateMesh();
+        sp->task_id = rad::ThreadPool::CurrentTaskId;
       } else {
         LOG_F(INFO, "task (%s) already deleted", path.c_str());
       }
@@ -307,6 +325,10 @@ std::shared_ptr<Model::Thumbnail> Intent::PrefetchThumbnail(
   }
 }
 
+void Intent::PresentContent(std::shared_ptr<Model::Content> content) {
+  m.present_content_path = content->path;
+  Dispatch(Intent::Reset{});
+}
 
 void Intent::EvictUnusedContent() {
   std::string prev, next;
@@ -338,21 +360,6 @@ void Intent::EvictUnusedThumbnail() {
   std::erase_if(m.thumbnails, [=](const auto& item) {
     return ImGui::GetFrameCount() - item.second->last_shown_frame > 3;
   });
-}
-
-void Model::PushMRU(const std::string& path) {
-  if (path.empty()) {
-    return;
-  }
-
-  auto it = std::remove(mru.begin(), mru.end(), path);
-  if (it != mru.end()) {
-    mru.erase(it, mru.end());
-  }
-  mru.push_front(path);
-  while (mru.size() > 20) {
-    mru.erase(std::prev(mru.end()));
-  }
 }
 
 const std::shared_ptr<Model::Content> Model::GetContent() const {

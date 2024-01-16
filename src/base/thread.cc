@@ -3,6 +3,8 @@
 #include "minlog.h"
 using namespace std::chrono_literals;
 
+#include <shared_mutex>
+
 namespace rad {
 
 Timer::Timer() : start_(std::chrono::high_resolution_clock::now()) {}
@@ -24,76 +26,101 @@ double Timer::elapsed() {
   return value;
 }
 
-ThreadPool::ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {}
+thread_local ThreadPool::TaskId ThreadPool::CurrentTaskId;
 
-ThreadPool::ThreadPool(int concurrency) : running_() {
-  if (concurrency <= 0) {
+ThreadPool::ThreadPool(size_t concurrency)
+    : next_task_id_(1), running_count_(0) {
+  if (concurrency == 0) {
     concurrency = std::thread::hardware_concurrency();
   }
-  futures_.resize(concurrency);
+
+  workers_.reserve(concurrency);
+  for (auto i = 0; i < concurrency; ++i) {
+    workers_.emplace_back(&ThreadPool::worker, this);
+  }
 }
 
-ThreadPool::~ThreadPool() { Wait(); }
+ThreadPool::~ThreadPool() {
+  {
+    std::lock_guard lock(mutex_);
+    exit_ = true;
+  }
+  cv_.notify_all();
+  for (auto& worker : workers_) {
+    if (worker.joinable()) {
+      worker.join();
+    }
+  }
+}
 
-void ThreadPool::Post(Func func, uint64_t tag) {
+ThreadPool::TaskId ThreadPool::Post(TaskFunc func) {
   std::lock_guard lock(mutex_);
-  tasks_.emplace_back(Task{std::move(func), tag});
+  TaskId id = next_task_id_++;
+  task_map_.emplace(id, std::move(func));
+  cv_.notify_all();
+  return id;
+}
 
-  for (std::future<void>& future : futures_) {
-    if (future.valid() &&
-        (future.wait_for(0s) == std::future_status::timeout)) {
-      continue;
+void ThreadPool::worker() {
+  TaskId id;
+  TaskFunc func;
+
+  while (!exit_ || !task_map_.empty()) {
+    {
+      std::unique_lock lock(mutex_);
+      cv_.wait(lock, [&] { return exit_ || !task_map_.empty(); });
+      if (exit_) break;
+      if (task_map_.empty()) continue;
+
+      std::tie(id, func) = *task_map_.begin();
+      assert(id >= 1);
+      assert(func);
+      task_map_.erase(task_map_.begin());
     }
 
-    future = std::async(std::launch::async, [this] {
-      while (!tasks_.empty()) {
-        mutex_.lock();
-        if (tasks_.empty()) {
-          mutex_.unlock();
-          continue;
-        }
-        Task task = std::move(tasks_.front());
-        tasks_.erase(tasks_.begin());
-        mutex_.unlock();
-
-        running_++;
-        try {
-          if (!task.func) {
-            throw std::domain_error("task.func is empty.");
-          }
-          task.func();
-        } catch (std::exception& ex) {
-          DLOG_F("unhandled exception (%s).", ex.what());
-          assert(false && "unhandled exception.");
-        }
-        running_--;
-        cv_.notify_all();
-      }
-    });
+    running_count_++;
+    try {
+      ThreadPool::CurrentTaskId = id;
+      func();
+      cv_.notify_one();
+    } catch (std::exception& ex) {
+      DLOG_F("unhandled exception at id=%d reason=%s", id, ex.what());
+      assert(false && "unhandled exception.");
+    }
+    running_count_--;
   }
 }
 
-void ThreadPool::Cancel() {
+bool ThreadPool::TryCancel(TaskId id) {
   std::lock_guard lock(mutex_);
-  tasks_.clear();
-  cv_.notify_all();
+  auto it = task_map_.find(id);
+  if (it == task_map_.end()) {
+    return false;
+  }
+  task_map_.erase(it);
+  return true;
 }
 
-void ThreadPool::Cancel(uint64_t tag) {
+bool ThreadPool::TryCancelAll() {
   std::lock_guard lock(mutex_);
-  auto it = std::remove_if(tasks_.begin(), tasks_.end(),
-      [tag](const auto& task) { return task.tag == tag; });
-  if (it != tasks_.end()) {
-    tasks_.erase(it, tasks_.end());
-    cv_.notify_all();
+  if (task_map_.empty()) {
+    return false;
+  }
+  task_map_.clear();
+  return true;
+}
+
+void ThreadPool::Wait(TaskId id) {
+  std::unique_lock lock(mutex_);
+  auto it = task_map_.find(id);
+  if (it != task_map_.end()) {
+    cv_.wait(lock, [&] { return !task_map_.contains(id); });
   }
 }
 
-void ThreadPool::Wait() {
-  {
-    std::unique_lock lock(mutex_);
-    cv_.wait(lock, [&] { return tasks_.empty() && running_ == 0; });
-  }
+void ThreadPool::WaitAll() {
+  std::unique_lock lock(mutex_);
+  cv_.wait(lock, [&] { return task_map_.empty(); });
 }
 
 }  // namespace rad
