@@ -356,13 +356,13 @@ void View::renderContent() {
           rad::Mesh{
               .model = engine().CreatePlane(),
               .material = std::shared_ptr<rad::Material>(new rad::Material{
-                  .alpha = m.thumbnail_show ? 0.1f : 1.0f,
                   .texture = content->texture,
               }),
               .order = 0,
           });
     }
     mesh->enabled = true;
+    mesh->material->alpha = m.thumbnail_show ? 0.1f : 1.0f;
 
     float scaled_w = content->image->width * m.content_zoom;
     float scaled_h = content->image->height * m.content_zoom;
