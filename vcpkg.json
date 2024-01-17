@@ -3,6 +3,7 @@
   "version": "1.0",
   "dependencies": [
     { "name": "libavif", "features": ["aom"] },
-    { "name": "libjpeg-turbo" }
+    { "name": "libjpeg-turbo" },
+    { "name": "tiff" }
   ]
 }

@@ -1,14 +1,13 @@
 #include "image_rw_factory.h"
 
-#include <cassert>
-
 #include "libavif_rw.h"
 #include "libjpegturbo_rw.h"
+#include "libtiff_rw.h"
 #include "lodepng_rw.h"
 #include "pnm_rw.h"
 #include "stb_rw.h"
-// #include "wic_rw.h"
 #include "wuffs_rw.h"
+// #include "wic_rw.h"
 
 namespace rad {
 
@@ -26,6 +25,9 @@ std::unique_ptr<ImageDecoderBase> ImageRWFactory::Create(const std::string& path
 
   if (extension == ".png") {
     return std::make_unique<LodePngRW>();
+  }
+  if (extension == ".tiff" || extension == ".tif") {
+    return std::make_unique<LibTiffRW>();
   }
   if (extension == ".bmp" || extension == ".gif" || extension == ".jpeg" ||
       extension == ".jpg" || extension == ".tga") {

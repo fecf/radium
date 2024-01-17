@@ -20,6 +20,7 @@ enum class DecoderType {
   wic,
   wuffs,
   lodepng,
+  libtiff,
 };
 
 enum class FormatType {

@@ -49,11 +49,17 @@ project (name)
         "d3d12.lib",
         "dxgi.lib",
         "dxguid.lib",
-        "avif.lib",
-        "jpeg.lib",
+        -- libturbojpeg
         "turbojpeg.lib",
+        -- libavif
+        "jpeg.lib",
+        "avif.lib",
         "yuv.lib",
         "aom.lib",
+        -- libtiff
+        "tiff.lib",
+        "zlib.lib",
+        "lzma.lib",
     }
     flags { 
          "MultiProcessorCompile",
