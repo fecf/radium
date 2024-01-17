@@ -1,7 +1,7 @@
 #include "primary.h"
 #include "../../gfx/color_space.h"
 
-static const float pi = 3.141592635;
+#include "color_space.hlsli"
 
 cbuffer Vtx : register(b0) {
     column_major float4x4 vtx;
@@ -13,201 +13,6 @@ ConstantBuffer<Constants> constants : register(b1);
 Texture2DArray tex : register(t0);
 SamplerState sampler_point : register(s0);
 SamplerState sampler_linear : register(s1);
-
-float3 reinhard(float3 hdr, float k = 1.0)
-{
-    return hdr / (hdr + k);
-}
-float3 reinhard_inverse(float3 sdr, float k = 1.0)
-{
-    return k * sdr / (k - sdr);
-}
-float3 standard(float3 hdr)
-{
-    return reinhard(hdr * sqrt(hdr), sqrt(4.0 / 27.0));
-}
-float3 standard_inverse(float3 sdr)
-{
-    return pow(reinhard_inverse(sdr, sqrt(4.0 / 27.0)), 2.0 / 3.0);
-}
-float3 aces(float3 hdr)
-{
-    const float A = 2.51, B = 0.03, C = 2.43, D = 0.59, E = 0.14;
-    return saturate((hdr * (A * hdr + B)) / (hdr * (C * hdr + D) + E));
-}
-float3 aces_inverse(float3 sdr)
-{
-    const float A = 2.51, B = 0.03, C = 2.43, D = 0.59, E = 0.14;
-    return 0.5 *
-         (D * sdr -
-             sqrt(((D * D - 4 * C * E) * sdr + 4 * A * E - 2 * B * D) * sdr +
-                  B * B) -
-             B) /
-         (A - C * sdr);
-}
-
-// https://godotshaders.com/shader/colorblindness-correction-shader/
-float3 simulate_color_blind(float3 rgb, Colorblind mode, float intensity)
-{
-    float L = (17.8824 * rgb.r) + (43.5161 * rgb.g) + (4.11935 * rgb.b);
-    float M = (3.45565 * rgb.r) + (27.1554 * rgb.g) + (3.86714 * rgb.b);
-    float S = (0.0299566 * rgb.r) + (0.184309 * rgb.g) + (1.46709 * rgb.b);
-
-    float l, m, s;
-    if (mode == Colorblind::Protanopia)
-    {
-        l = 0.0 * L + 2.02344 * M + -2.52581 * S;
-        m = 0.0 * L + 1.0 * M + 0.0 * S;
-        s = 0.0 * L + 0.0 * M + 1.0 * S;
-    }
-    else if (mode == Colorblind::Deuteranopia)
-    {
-        l = 1.0 * L + 0.0 * M + 0.0 * S;
-        m = 0.494207 * L + 0.0 * M + 1.24827 * S;
-        s = 0.0 * L + 0.0 * M + 1.0 * S;
-    }
-    else if (mode == Colorblind::Tritanopia)
-    {
-        l = 1.0 * L + 0.0 * M + 0.0 * S;
-        m = 0.0 * L + 1.0 * M + 0.0 * S;
-        s = -0.395913 * L + 0.801109 * M + 0.0 * S;
-    }
-
-    float3 error;
-    error.r = (0.0809444479 * l) + (-0.130504409 * m) + (0.116721066 * s);
-    error.g = (-0.0102485335 * l) + (0.0540193266 * m) + (-0.113614708 * s);
-    error.b = (-0.000365296938 * l) + (-0.00412161469 * m) + (0.693511405 * s);
-    float3 diff = rgb - error;
-    float3 correction;
-    correction.r = 0.0;
-    correction.g = (diff.r * 0.7) + (diff.g * 1.0);
-    correction.b = (diff.r * 0.7) + (diff.b * 1.0);
-    correction = rgb + correction * intensity;
-    return correction;
-}
-
-float3 srgb_to_xyzd65(float3 srgb)
-{
-    const float3x3 m =
-    {
-        { 506752.0 / 1228815.0, 87881.0 / 245763.0, 12673.0 / 70218.0 },
-        { 87098.0 / 409605.0, 175762.0 / 245763.0, 12673.0 / 175545.0 },
-        { 7918.0 / 409605.0, 87881.0 / 737289.0, 1001167.0 / 1053270.0 },
-    };
-    return mul(m, srgb);
-}
-
-float3 xyzd65_to_srgb(float3 xyz)
-{
-    const float3x3 m =
-    {
-        { 12831.0 / 3959.0, -329.0 / 214.0, -1974.0 / 3959.0 },
-        { -851781.0 / 878810.0, 1648619.0 / 878810.0, 36519.0 / 878810.0 },
-        { 705.0 / 12673.0, -2585.0 / 12673.0, 705.0 / 667.0 },
-    };
-    return mul(m, xyz);
-}
-
-float3 xyzd65_to_oklab(float3 xyz)
-{
-    float3x3 xyz_to_lms =
-    {
-        { 0.8190224432164319, 0.3619062562801221, -0.12887378261216414 },
-        { 0.0329836671980271, 0.9292868468965546, 0.03614466816999844 },
-        { 0.048177199566046255, 0.26423952494422764, 0.6335478258136937 }
-    };
-    float3x3 lms_to_oklab =
-    {
-        { 0.2104542553, 0.7936177850, -0.0040720468 },
-        { 1.9779984951, -2.4285922050, 0.4505937099 },
-        { 0.0259040371, 0.7827717662, -0.8086757660 }
-    };
-    float3 lms = mul(xyz_to_lms, xyz);
-    float3 oklab = mul(lms_to_oklab, pow(max(0.0, lms), 1.0 / 3.0));
-    return oklab;
-}
-
-float3 oklab_to_xyzd65(float3 oklab)
-{
-    float3x3 lms_to_xyz =
-    {
-        { 1.2268798733741557, -0.5578149965554813, 0.28139105017721583 },
-        { -0.04057576262431372, 1.1122868293970594, -0.07171106666151701 },
-        { -0.07637294974672142, -0.4214933239627914, 1.5869240244272418 }
-    };
-    float3x3 oklab_to_lms =
-    {
-        { 0.99999999845051981432, 0.39633779217376785678, 0.21580375806075880339 },
-        { 1.0000000088817607767, -0.1055613423236563494, -0.063854174771705903402 },
-        { 1.0000000546724109177, -0.089484182094965759684, -1.2914855378640917399 }
-    };
-
-    float3 lmsnl = mul(oklab_to_lms, oklab);
-    float3 xyzd65 = mul(lms_to_xyz, pow(lmsnl, 3.0));
-    return xyzd65;
-}
-
-float3 oklab_to_oklch(float3 oklab)
-{
-    const float e = 0.0002;
-    float hue;
-    if (abs(oklab.y) < e && abs(oklab.z) < e)
-    {
-        hue = 0.0;
-    }
-    else
-    {
-        hue = atan2(oklab.z, oklab.y) * 180 / pi;
-    }
-
-    return float3(
-		oklab.x,
-		sqrt(oklab.y * oklab.y + oklab.z * oklab.z),
-		(hue >= 0.0) ? hue : (hue + 360.0)
-	);
-}
-
-float3 oklch_to_oklab(float3 oklch)
-{
-    float a, b;
-    if (isnan(oklch.z))
-    {
-        a = 0;
-        b = 0;
-    }
-    else
-    {
-        a = oklch.y * cos(oklch.z * pi / 180.0);
-        b = oklch.y * sin(oklch.z * pi / 180.0);
-    }
-    return float3(oklch.x, a, b);
-}
-
-float3 srgb_to_linear(float3 color)
-{
-    // approx pow(color, 2.2)
-    return select(color < 0.04045, color / 12.92, pow(abs(color + 0.055) / 1.055, 2.4));
-}
-
-float3 linear_to_srgb(float3 color)
-{
-    // approx pow(color, 1.0 / .2)
-    return select(color < 0.0031308, 12.92 * color, 1.055 * pow(abs(color), 1.0 / 2.4) - 0.055);
-}
-
-float3 pq_eotf(float3 color)
-{
-    const float c1 = 0.8359375; // 3424.f/4096.f;
-    const float c2 = 18.8515625; // 2413.f/4096.f*32.f;
-    const float c3 = 18.6875; // 2392.f/4096.f*32.f;
-    const float m1 = 0.159301758125; // 2610.f / 4096.f / 4;
-    const float m2 = 78.84375; // 2523.f / 4096.f * 128.f;
-    float3 M = c2 - c3 * pow(abs(color), 1 / m2);
-    float3 N = max(pow(abs(color), 1 / m2) - c1, 0);
-    float3 L = pow(abs(N / M), 1 / m1);
-    L = L * 10000.0;
-    return L;
-}
 
 struct VSInput
 {
@@ -314,38 +119,45 @@ float4 PS(VSOutput input) : SV_Target
         case ColorPrimaries::Unknown:
             break;
         case ColorPrimaries::BT709:
-            // todo:
             break;
         case ColorPrimaries::BT601:
-            // todo:
+            c.rgb = bt601_to_bt709(c.rgb);
             break;
         case ColorPrimaries::BT2020:
-            // BT.2020 -> BT.709
-            float3x3 mat = { 1.6605, -0.5877, -0.0728, -0.1246, 1.1330, -0.0084, -0.0182, -0.1006, 1.1187 };
-            c.r = c.r * mat[0][0] + c.g * mat[0][1] + c.b * mat[0][2];
-            c.g = c.r * mat[1][0] + c.g * mat[1][1] + c.b * mat[1][2];
-            c.b = c.r * mat[2][0] + c.g * mat[2][1] + c.b * mat[2][2];
+            c.rgb = bt2020_to_bt709(c.rgb);
             break;
     }
     switch (constants.transfer_characteristics)
     {
+        case TransferCharacteristics::Linear:
+            break;
         case TransferCharacteristics::Unknown:
-            c.rgb = srgb_to_linear(c.rgb);
+            c.rgb = srgb_eotf(c.rgb);
+            c.rgb /= 80.0;
             break;
         case TransferCharacteristics::sRGB:
-            c.rgb = srgb_to_linear(c.rgb);
+            c.rgb = srgb_eotf(c.rgb);
+            c.rgb /= 80.0;
             break;
-        case TransferCharacteristics::Linear:
+        case TransferCharacteristics::BT601:
+            c.rgb = bt601_eotf(c.rgb);
+            c.rgb /= 80.0;
+            break;
+        case TransferCharacteristics::BT709:
+            c.rgb = bt709_eotf(c.rgb);
+            c.rgb /= 80.0;
             break;
         case TransferCharacteristics::ST2084:
             c.rgb = pq_eotf(c.rgb);
-            c.rgb /= 80.0;  // 125.0 = 10000 nits
+            c.rgb /= 80.0;
             break;
         case TransferCharacteristics::STDB67:
-            // todo:
+            c.rgb = hlg_eotf(c.rgb);
+            c.rgb /= 80.0;
             break;
     }
 
+    /*
     // tone mapping (hdr -> sdr)
     if (constants.tone_mapping == ToneMapping::Standard)
     {
@@ -428,11 +240,13 @@ float4 PS(VSOutput input) : SV_Target
     {
         c.rgb = aces_inverse(c.rgb);
     }
+    */
 
-    c.rgb = clamp(c.rgb, 0.0, 1.0);
+    // DXGI_FORMAT_R16G16B16A16_FLOAT: scRGB Linear
+    // c.rgb = srgb_oetf(c.rgb);
+
+    c.rgb = clamp(c.rgb, -0.5, 7.4999);
     c.a *= constants.alpha;
-
-    // final result
-    return max(0.0, c);
+    return c;
 }
 

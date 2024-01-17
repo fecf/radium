@@ -10,8 +10,10 @@ enum class ColorPrimaries : int {
 
 enum class TransferCharacteristics : int {
   Unknown,
-  sRGB,
   Linear,
+  sRGB,
+  BT601,
+  BT709,
   ST2084,  // PQ
   STDB67,  // HLG
 };
