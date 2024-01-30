@@ -21,6 +21,7 @@ enum class DecoderType {
   wuffs,
   lodepng,
   libtiff,
+  ico,
 };
 
 enum class FormatType {

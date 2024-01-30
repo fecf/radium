@@ -1,5 +1,6 @@
 #include "image_rw_factory.h"
 
+#include "ico_rw.h"
 #include "libavif_rw.h"
 #include "libjpegturbo_rw.h"
 #include "libtiff_rw.h"
@@ -38,6 +39,9 @@ std::unique_ptr<ImageDecoderBase> ImageRWFactory::Create(const std::string& path
   }
   if (extension == ".psd" || extension == ".hdr" || extension == ".pic") {
     return std::make_unique<StbRW>();
+  }
+  if (extension == ".ico" || extension == ".icon") {
+    return std::make_unique<IcoRW>();
   }
   // if (extension == ".tif" || extension == ".tiff" || extension == ".ico" ||
   //     extension == ".jxr") {
